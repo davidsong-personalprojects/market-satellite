@@ -6,22 +6,31 @@ import { CompanyRow } from '@/components/CompanyRow';
 
 interface CompanyTableProps {
   companies: Company[];
+  isLoading?: boolean;
 }
 
 const COLUMNS = [
   { label: 'Company',    align: 'left'  },
+  { label: 'Batch',      align: 'right' },
   { label: 'HC Growth',  align: 'right' },
   { label: 'Valuation',  align: 'right' },
-  { label: 'Culture',    align: 'right' },
   { label: 'Employees',  align: 'right' },
   { label: 'Open Roles', align: 'right' },
 ] as const;
 
-export function CompanyTable({ companies }: CompanyTableProps) {
+export function CompanyTable({ companies, isLoading = false }: CompanyTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   function toggleRow(id: string) {
     setExpandedId((prev) => (prev === id ? null : id));
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
+        Loading…
+      </div>
+    );
   }
 
   if (companies.length === 0) {
