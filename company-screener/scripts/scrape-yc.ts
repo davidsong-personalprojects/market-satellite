@@ -24,6 +24,16 @@ interface AlgoliaResult {
   results: Array<{ hits: AlgoliaHit[]; nbPages: number; page: number }>;
 }
 
+function normalizeBatch(batch: string | undefined): string {
+  if (!batch) return 'Unknown';
+  const m = batch.match(/^(Winter|Spring|Summer|Fall)\s+(\d{4})$/);
+  if (!m) return batch; // already abbreviated or unknown format
+  const prefix: Record<string, string> = {
+    Winter: 'W', Spring: 'SP', Summer: 'S', Fall: 'F',
+  };
+  return `${prefix[m[1]]}${m[2].slice(2)}`; // e.g. "F25", "S25", "SP25", "W26"
+}
+
 function midpoint(range: string | undefined): number {
   if (!range) return 1;
   const map: Record<string, number> = {
@@ -94,7 +104,7 @@ async function main() {
           name: hit.name,
           website: hit.website ?? '',
           description: hit.one_liner ?? '',
-          batch: hit.batch ?? 'Unknown',
+          batch: normalizeBatch(hit.batch),
           sector: toSector(hit.tags),
           location: toLocation(hit.city, hit.country),
           employeeCount: midpoint(hit.team_size),
@@ -109,7 +119,7 @@ async function main() {
           name: hit.name,
           website: hit.website ?? '',
           description: hit.one_liner ?? '',
-          batch: hit.batch ?? 'Unknown',
+          batch: normalizeBatch(hit.batch),
           sector: toSector(hit.tags),
           location: toLocation(hit.city, hit.country),
           employeeCount: midpoint(hit.team_size),
