@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sync": "npx tsx scripts/scrape-yc.ts && npx tsx scripts/check-careers.ts && npx tsx scripts/scrape-crunchbase.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
