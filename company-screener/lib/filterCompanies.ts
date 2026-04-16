@@ -1,42 +1,20 @@
 import type {
   Company,
   FilterState,
-  HiringSignal,
-  CultureBand,
+  CompanyType,
   CompanySizeBand,
   ValuationTier,
 } from '@/types/company';
 
 export const EMPTY_FILTERS: FilterState = {
   search: '',
-  stages: [],
+  batches: [],
   sectors: [],
-  hiringSignals: [],
-  cultureScores: [],
+  activeOnly: false,
   companySizes: [],
   valuationTiers: [],
   locations: [],
-  techStack: [],
 };
-
-function matchesHiringSignal(pct: number, signal: HiringSignal): boolean {
-  switch (signal) {
-    case 'rapid':     return pct > 25;
-    case 'growing':   return pct >= 10 && pct <= 25;
-    case 'stable':    return pct >= 0 && pct < 10;
-    case 'shrinking': return pct < 0;
-  }
-}
-
-function matchesCultureBand(score: number | null, band: CultureBand): boolean {
-  if (score === null) return false;
-  switch (band) {
-    case 'excellent': return score >= 4.5;
-    case 'very-good': return score >= 4.0 && score < 4.5;
-    case 'good':      return score >= 3.5 && score < 4.0;
-    case 'below':     return score < 3.5;
-  }
-}
 
 function matchesSizeBand(count: number, band: CompanySizeBand): boolean {
   switch (band) {
@@ -59,27 +37,19 @@ function matchesValuationTier(val: number | null, tier: ValuationTier): boolean 
   }
 }
 
+// Retained for unit tests. Not called at runtime — filtering runs server-side via Prisma.
 export function filterCompanies(companies: Company[], filters: FilterState): Company[] {
   return companies.filter((c) => {
     if (filters.search && !c.name.toLowerCase().includes(filters.search.toLowerCase())) {
       return false;
     }
-    if (filters.stages.length > 0 && !filters.stages.includes(c.stage)) {
+    if (filters.batches.length > 0 && !filters.batches.includes(c.batch)) {
       return false;
     }
     if (filters.sectors.length > 0 && !filters.sectors.includes(c.sector)) {
       return false;
     }
-    if (
-      filters.hiringSignals.length > 0 &&
-      !filters.hiringSignals.some((s) => matchesHiringSignal(c.hcGrowthPct, s))
-    ) {
-      return false;
-    }
-    if (
-      filters.cultureScores.length > 0 &&
-      !filters.cultureScores.some((b) => matchesCultureBand(c.cultureScore, b))
-    ) {
+    if (filters.activeOnly && !c.isActivelyHiring) {
       return false;
     }
     if (
@@ -88,21 +58,28 @@ export function filterCompanies(companies: Company[], filters: FilterState): Com
     ) {
       return false;
     }
-    if (filters.valuationTiers.length > 0) {
-      const val = c.valuation ?? c.marketCap;
-      if (!filters.valuationTiers.some((t) => matchesValuationTier(val, t))) {
-        return false;
-      }
+    if (
+      filters.valuationTiers.length > 0 &&
+      !filters.valuationTiers.some((t) => matchesValuationTier(c.valuation, t))
+    ) {
+      return false;
     }
     if (filters.locations.length > 0 && !filters.locations.includes(c.location)) {
       return false;
     }
-    if (
-      filters.techStack.length > 0 &&
-      !filters.techStack.some((t) => c.techStack.includes(t))
-    ) {
-      return false;
-    }
     return true;
   });
+}
+
+export function buildQueryString(type: CompanyType, filters: FilterState): string {
+  const params = new URLSearchParams();
+  params.set('type', type);
+  if (filters.search) params.set('search', filters.search);
+  if (filters.batches.length > 0) params.set('batches', filters.batches.join(','));
+  if (filters.sectors.length > 0) params.set('sectors', filters.sectors.join(','));
+  if (filters.locations.length > 0) params.set('locations', filters.locations.join(','));
+  if (filters.companySizes.length > 0) params.set('sizes', filters.companySizes.join(','));
+  if (filters.valuationTiers.length > 0) params.set('valuationTiers', filters.valuationTiers.join(','));
+  if (filters.activeOnly) params.set('activeOnly', 'true');
+  return params.toString();
 }
