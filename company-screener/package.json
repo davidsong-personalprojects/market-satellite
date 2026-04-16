@@ -11,6 +11,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "@prisma/adapter-neon": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "@tanstack/react-query": "^5.99.0",
     "next": "16.2.3",
