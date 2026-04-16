@@ -10,8 +10,8 @@ interface SidebarProps {
 }
 
 const BATCH_OPTIONS = [
-  'F25', 'SP25', 'S25', 'W25', 'F24', 'SP24', 'S24', 'W24',
-  'F23', 'SP23', 'S23', 'W23', 'S22', 'W22', 'S21', 'W21',
+  'W26', 'SP26', 'F25', 'SP25', 'S25', 'W25', 'F24', 'SP24',
+  'S24', 'W24', 'F23', 'SP23', 'S23', 'W23', 'S22', 'W22',
 ].map((b) => ({ value: b, label: b }));
 
 const SECTOR_OPTIONS = [
