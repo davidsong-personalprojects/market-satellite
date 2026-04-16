@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 (P1012): `url` is no longer valid in schema.prisma.
+// Connection URL is configured in prisma.config.ts instead.
+datasource db {
+  provider = "postgresql"
+}
+
+model Company {
+  id               String            @id
+  name             String
+  website          String
+  description      String
+  batch            String
+  sector           String
+  location         String
+  employeeCount    Int
+  type             String            @default("venture")
+  openRoles        Int               @default(0)
+  isActivelyHiring Boolean           @default(false)
+  valuation        Float?
+  lastRound        String?
+  hcGrowthPct      Float?
+  updatedAt        DateTime          @updatedAt
+  snapshots        CompanySnapshot[]
+}
+
+model CompanySnapshot {
+  id        Int      @id @default(autoincrement())
+  companyId String
+  openRoles Int
+  scrapedAt DateTime @default(now())
+  company   Company  @relation(fields: [companyId], references: [id])
+}
