@@ -11,6 +11,8 @@ import {
 } from '@/lib/claude'
 import type Anthropic from '@anthropic-ai/sdk'
 
+const MAX_TOOL_ROUNDS = 10
+
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -41,101 +43,115 @@ export async function POST(
     masterResumeContent: masterResume.content,
   })
 
-  // Agentic tool-use loop: Claude may call web_search multiple times
   const messages: Anthropic.Messages.MessageParam[] = [
     { role: 'user', content: userMessage },
   ]
   const collectedToolResults: Anthropic.Messages.ToolResultBlockParam[] = []
-
   let finalText = ''
+  let rounds = 0
 
-  while (true) {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 8000,
-      system: SYSTEM_PROMPT,
-      tools: [
-        {
-          name: 'web_search',
-          description: 'Search the web for information about a company or topic',
-          input_schema: {
-            type: 'object' as const,
-            properties: {
-              query: { type: 'string', description: 'The search query' },
+  try {
+    while (rounds < MAX_TOOL_ROUNDS) {
+      rounds++
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8000,
+        system: SYSTEM_PROMPT,
+        tools: [
+          {
+            name: 'web_search',
+            description: 'Search the web for information about a company or topic',
+            input_schema: {
+              type: 'object' as const,
+              properties: {
+                query: { type: 'string', description: 'The search query' },
+              },
+              required: ['query'],
             },
-            required: ['query'],
           },
-        },
-      ],
-      messages,
-    })
+        ],
+        messages,
+      })
 
-    if (response.stop_reason === 'end_turn') {
-      finalText = response.content
+      // Collect any text from this response (used as fallback if loop exits unexpectedly)
+      const textFromResponse = response.content
         .filter((b): b is Anthropic.Messages.TextBlock => b.type === 'text')
         .map((b) => b.text)
         .join('\n')
+      if (textFromResponse) finalText = textFromResponse
+
+      if (response.stop_reason === 'end_turn') {
+        break
+      }
+
+      if (response.stop_reason === 'tool_use') {
+        const toolUseBlocks = response.content.filter(
+          (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use'
+        )
+
+        messages.push({ role: 'assistant', content: response.content })
+
+        const toolResults: Anthropic.Messages.ToolResultBlockParam[] = await Promise.all(
+          toolUseBlocks.map(async (block) => {
+            const input = block.input as { query: string }
+            const searchResult = await performWebSearch(input.query)
+            const resultBlock: Anthropic.Messages.ToolResultBlockParam = {
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content: searchResult,
+            }
+            collectedToolResults.push(resultBlock)
+            return resultBlock
+          })
+        )
+
+        messages.push({ role: 'user', content: toolResults })
+        continue
+      }
+
+      // Unexpected stop reason — use whatever text we have and exit
+      console.warn(`Unexpected stop_reason: ${response.stop_reason}`)
       break
     }
 
-    if (response.stop_reason === 'tool_use') {
-      const toolUseBlocks = response.content.filter(
-        (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use'
-      )
-
-      messages.push({ role: 'assistant', content: response.content })
-
-      const toolResults: Anthropic.Messages.ToolResultBlockParam[] = await Promise.all(
-        toolUseBlocks.map(async (block) => {
-          const input = block.input as { query: string }
-          const searchResult = await performWebSearch(input.query)
-          const resultBlock: Anthropic.Messages.ToolResultBlockParam = {
-            type: 'tool_result',
-            tool_use_id: block.id,
-            content: searchResult,
-          }
-          collectedToolResults.push(resultBlock)
-          return resultBlock
-        })
-      )
-
-      messages.push({ role: 'user', content: toolResults })
-      continue
+    if (rounds >= MAX_TOOL_ROUNDS) {
+      console.warn(`Generate hit MAX_TOOL_ROUNDS (${MAX_TOOL_ROUNDS}) for application ${applicationId}`)
     }
+  } catch (err) {
+    console.error('Claude API error during generate:', err)
+    return NextResponse.json({ error: 'AI generation failed' }, { status: 502 })
+  }
 
-    // Unexpected stop reason — break to avoid infinite loop
-    break
+  if (!finalText) {
+    return NextResponse.json({ error: 'No response from AI' }, { status: 502 })
   }
 
   const resumeContent = extractResumePart(finalText)
   const companyResearch = extractCompanyResearchFromToolResults(collectedToolResults)
 
-  const existingVersionCount = await prisma.resumeVersion.count({
-    where: { applicationId },
-  })
+  // Use interactive transaction to compute versionNumber inside the transaction,
+  // avoiding a race condition with concurrent generate calls on the same application.
+  const { version } = await prisma.$transaction(async (tx) => {
+    const agg = await tx.resumeVersion.aggregate({
+      where: { applicationId },
+      _max: { versionNumber: true },
+    })
+    const nextVersionNumber = (agg._max.versionNumber ?? 0) + 1
 
-  const [version] = await prisma.$transaction([
-    prisma.resumeVersion.create({
-      data: {
-        applicationId,
-        versionNumber: existingVersionCount + 1,
-        content: resumeContent,
-      },
-    }),
-    prisma.application.update({
+    const newVersion = await tx.resumeVersion.create({
+      data: { applicationId, versionNumber: nextVersionNumber, content: resumeContent },
+    })
+    await tx.application.update({
       where: { id: applicationId },
-      // CompanyResearch satisfies InputJsonValue at runtime; cast required because
-      // Prisma's InputJsonObject demands an index signature our interface omits.
+      // Prisma types Json as JsonValue; cast through unknown to satisfy the type checker.
+      // We control what goes into this field — it's always a valid CompanyResearch object.
       data: { companyResearch: companyResearch as unknown as Prisma.InputJsonValue },
-    }),
-    prisma.chatMessage.create({
-      data: {
-        applicationId,
-        role: 'assistant',
-        content: finalText,
-      },
-    }),
-  ])
+    })
+    await tx.chatMessage.create({
+      data: { applicationId, role: 'assistant', content: finalText },
+    })
+    return { version: newVersion }
+  })
 
   return NextResponse.json({ version, companyResearch })
 }
