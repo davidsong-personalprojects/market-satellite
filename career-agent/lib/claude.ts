@@ -91,7 +91,16 @@ export function extractCompanyResearchFromToolResults(
   toolResults: Anthropic.Messages.ToolResultBlockParam[]
 ): CompanyResearch {
   const rawSources = toolResults
-    .map((r) => (typeof r.content === 'string' ? r.content : JSON.stringify(r.content)))
+    .map((r) => {
+      if (typeof r.content === 'string') return r.content
+      if (Array.isArray(r.content)) {
+        return r.content
+          .filter((b): b is Anthropic.Messages.TextBlockParam => b.type === 'text')
+          .map((b) => b.text)
+          .join('\n')
+      }
+      return ''
+    })
     .filter(Boolean)
 
   return {

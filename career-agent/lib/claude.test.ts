@@ -1,7 +1,7 @@
 // @vitest-environment node
 // lib/claude.test.ts
 import { describe, it, expect } from 'vitest'
-import { buildGenerateMessage, buildIterateContext, parseIterationResponse } from './claude'
+import { buildGenerateMessage, buildIterateContext, parseIterationResponse, extractResumePart } from './claude'
 
 describe('buildGenerateMessage', () => {
   it('includes company, role, JD, and master resume in the message', () => {
@@ -46,5 +46,17 @@ describe('parseIterationResponse', () => {
     const { resumeMarkdown, changeSummary } = parseIterationResponse(raw)
     expect(resumeMarkdown).toBe('# Resume content only')
     expect(changeSummary).toBe('')
+  })
+})
+
+describe('extractResumePart', () => {
+  it('strips ## Gap Analysis and everything after it', () => {
+    const full = '# Resume\n\n## Experience\n- Bullet\n\n## Gap Analysis\n- Missing skill'
+    expect(extractResumePart(full)).toBe('# Resume\n\n## Experience\n- Bullet')
+  })
+
+  it('returns full response when no ## Gap Analysis present', () => {
+    const full = '# Resume\n\n## Experience\n- Bullet'
+    expect(extractResumePart(full)).toBe('# Resume\n\n## Experience\n- Bullet')
   })
 })
