@@ -31,7 +31,9 @@ model ResumeVersion {
   versionNumber Int
   content       String
   createdAt     DateTime    @default(now())
-  application   Application @relation(fields: [applicationId], references: [id])
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
 }
 
 model ChatMessage {
@@ -40,7 +42,9 @@ model ChatMessage {
   role          MessageRole
   content       String
   createdAt     DateTime    @default(now())
-  application   Application @relation(fields: [applicationId], references: [id])
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
 }
 
 enum MessageRole {
