@@ -8,7 +8,7 @@ function createPrismaClient() {
   // Prisma 7 requires adapter to be passed to PrismaClient constructor directly.
   const url = process.env.DATABASE_URL
   if (!url) throw new Error('DATABASE_URL is not set')
-  const adapter = new PrismaNeonHttp(url)
+  const adapter = new PrismaNeonHttp(url, {})
   return new PrismaClient({ adapter })
 }
 
