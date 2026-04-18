@@ -7,8 +7,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+  const numId = Number(id)
+  if (!Number.isInteger(numId) || numId < 1) {
+    return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+  }
   const messages = await prisma.chatMessage.findMany({
-    where: { applicationId: Number(id) },
+    where: { applicationId: numId },
     orderBy: { createdAt: 'asc' },
   })
   return NextResponse.json(messages)

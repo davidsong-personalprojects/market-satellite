@@ -11,7 +11,13 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const { content } = await request.json() as { content: string }
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const { content } = body as { content: string }
   if (typeof content !== 'string' || content.trim() === '') {
     return NextResponse.json({ error: 'content is required' }, { status: 400 })
   }

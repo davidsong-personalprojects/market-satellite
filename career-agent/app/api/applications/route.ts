@@ -11,7 +11,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json() as {
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  const { companyName, jobTitle, industry, jobUrl, jobDescription } = body as {
     companyName: string
     jobTitle: string
     industry: string
@@ -19,14 +26,17 @@ export async function POST(request: Request) {
     jobDescription: string
   }
 
-  const { companyName, jobTitle, industry, jobUrl, jobDescription } = body
-
-  if (!companyName || !jobTitle || !industry || !jobDescription) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  if (
+    typeof companyName !== 'string' || !companyName.trim() ||
+    typeof jobTitle !== 'string' || !jobTitle.trim() ||
+    typeof industry !== 'string' || !industry.trim() ||
+    typeof jobDescription !== 'string' || !jobDescription.trim()
+  ) {
+    return NextResponse.json({ error: 'Missing or invalid required fields' }, { status: 400 })
   }
 
   const application = await prisma.application.create({
-    data: { companyName, jobTitle, industry, jobUrl: jobUrl ?? null, jobDescription },
+    data: { companyName: companyName.trim(), jobTitle: jobTitle.trim(), industry: industry.trim(), jobUrl: jobUrl ?? null, jobDescription },
   })
 
   return NextResponse.json(application, { status: 201 })

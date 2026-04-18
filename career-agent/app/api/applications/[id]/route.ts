@@ -7,8 +7,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+  const numId = Number(id)
+  if (!Number.isInteger(numId) || numId < 1) {
+    return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+  }
   const application = await prisma.application.findUnique({
-    where: { id: Number(id) },
+    where: { id: numId },
     include: { _count: { select: { versions: true } } },
   })
   if (!application) {

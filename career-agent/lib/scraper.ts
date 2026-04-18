@@ -10,12 +10,19 @@ export function extractText(html: string): string {
 }
 
 export async function fetchJobDescription(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; career-agent/1.0)' },
-  })
-  if (!response.ok) {
-    throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 10_000)
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; career-agent/1.0)' },
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`)
+    }
+    const html = await response.text()
+    return extractText(html)
+  } finally {
+    clearTimeout(timer)
   }
-  const html = await response.text()
-  return extractText(html)
 }

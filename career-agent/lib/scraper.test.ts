@@ -23,6 +23,8 @@ describe('extractText', () => {
     expect(result).toContain('5+ years experience')
     expect(result).toContain('TypeScript')
     expect(result).not.toContain('alert(1)')
+    expect(result).not.toContain('Home | About')    // nav stripped
+    expect(result).not.toContain('Copyright 2026')  // footer stripped
   })
 
   it('returns empty string for empty HTML', () => {
