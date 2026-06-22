@@ -1,0 +1,2462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketSatellite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#0F1923; --bg-card:#152030; --bg-deep:#0A1118; --bg-row:#111D28;
+  --border:#1C2C3C; --border-lt:#243444;
+  --text:#F0EDE6; --text-dim:#A8BED0; --text-faint:#607888;
+  --green:#3DAB6E; --red:#C45252; --amber:#C99038; --blue:#4A88CC;
+  --mono:'IBM Plex Mono',monospace; --sans:'Inter',sans-serif;
+}
+html,body { background:var(--bg); color:var(--text); font-family:var(--sans); font-size:17px; line-height:1.5; min-height:100vh; }
+
+/* NAV */
+.nav { display:flex; align-items:center; justify-content:space-between; padding:0 20px; height:48px; background:var(--bg-deep); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; }
+.nav-logo { font-family:var(--mono); font-size:18px; font-weight:500; color:var(--text); letter-spacing:.05em; }
+.nav-logo em { color:var(--amber); font-style:normal; }
+.nav-tabs { display:flex; gap:2px; }
+.nav-tab { padding:5px 14px; border-radius:4px; font-size:15px; font-weight:500; cursor:pointer; border:none; background:transparent; color:var(--text-dim); letter-spacing:.05em; font-family:var(--mono); transition:all .15s; }
+.nav-tab.active { background:var(--bg-card); color:var(--text); }
+.nav-tab:hover:not(.active) { color:var(--text); }
+.nav-right { display:flex; align-items:center; gap:12px; }
+.nav-status { font-family:var(--mono); font-size:14px; color:var(--text-faint); }
+.nav-status .dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--green); margin-right:5px; animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* LAYOUT */
+.view { display:none; padding:16px 20px; max-width:1440px; margin:0 auto; }
+.view.active { display:block; }
+
+/* TOOLBAR */
+.toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.toolbar-left { display:flex; align-items:center; gap:10px; }
+.page-title { font-family:var(--mono); font-size:16px; color:var(--text-dim); letter-spacing:.08em; }
+.last-updated { font-family:var(--mono); font-size:14px; color:var(--text-faint); }
+.refresh-btn { display:flex; align-items:center; gap:5px; background:none; border:1px solid var(--border); color:var(--text-dim); font-family:var(--mono); font-size:14px; padding:5px 10px; border-radius:4px; cursor:pointer; transition:all .15s; letter-spacing:.05em; }
+.refresh-btn:hover { border-color:var(--amber); color:var(--amber); }
+.refresh-btn:disabled { opacity:.4; cursor:not-allowed; }
+.refresh-btn svg { width:10px; height:10px; flex-shrink:0; }
+.src-badge { font-family:var(--mono); font-size:13px; padding:2px 6px; border-radius:3px; border:1px solid var(--border); color:var(--text-faint); }
+.src-badge.free { border-color:rgba(61,171,110,.25); color:var(--green); }
+
+/* SECTION */
+.section { margin-bottom:18px; }
+.section-hdr { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.section-title { font-family:var(--mono); font-size:13px; letter-spacing:.15em; color:var(--text-faint); }
+.section-hdr::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* INDICATOR GRID */
+.ind-grid { display:grid; grid-template-columns:repeat(8,1fr); gap:8px; }
+.ind-card { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:11px 13px; position:relative; overflow:hidden; }
+.ind-card::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; }
+.ind-card.up::after { background:var(--green); }
+.ind-card.down::after { background:var(--red); }
+.ind-card.flat::after { background:var(--text-faint); }
+.ind-label { font-family:var(--mono); font-size:12px; color:var(--text-faint); letter-spacing:.1em; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ind-val { font-family:var(--mono); font-size:22px; font-weight:500; line-height:1; }
+.ind-chg { font-family:var(--mono); font-size:14px; margin-top:4px; }
+.ind-chg.up { color:var(--green); } .ind-chg.down { color:var(--red); } .ind-chg.flat { color:var(--text-faint); }
+.ind-sub { font-size:14px; color:var(--text-faint); margin-top:5px; }
+
+/* FRED ROW */
+.fred-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.fred-card { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:11px 13px; }
+.fred-label { font-family:var(--mono); font-size:12px; color:var(--text-faint); letter-spacing:.1em; margin-bottom:6px; }
+.fred-val { font-family:var(--mono); font-size:24px; font-weight:500; }
+.fred-meta { font-size:14px; color:var(--text-faint); margin-top:4px; }
+.fred-note { font-size:14px; color:var(--amber); margin-top:4px; }
+
+/* SECTOR TABLE */
+.sector-grid { display:grid; grid-template-columns:repeat(11,1fr); gap:6px; }
+.sector-cell { background:var(--bg-card); border:1px solid var(--border); border-radius:5px; padding:8px 6px; text-align:center; }
+.sector-name { font-family:var(--mono); font-size:12px; color:var(--text-faint); letter-spacing:.06em; margin-bottom:4px; }
+.sector-pct { font-family:var(--mono); font-size:17px; font-weight:500; }
+.sector-pct.up { color:var(--green); } .sector-pct.down { color:var(--red); } .sector-pct.flat { color:var(--text-faint); }
+.sector-etf { font-family:var(--mono); font-size:12px; color:var(--text-faint); margin-top:2px; }
+
+/* HEAT BAR — visual for where price sits in 52w range */
+.heat-bar-wrap { height:3px; background:var(--border); border-radius:2px; margin-top:5px; position:relative; }
+.heat-bar-fill { height:100%; border-radius:2px; background:var(--amber); position:absolute; top:0; left:0; }
+.heat-dot { width:6px; height:6px; border-radius:50%; background:var(--text); border:1px solid var(--bg); position:absolute; top:-1.5px; transform:translateX(-50%); }
+
+/* NEWS GRID */
+.news-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.news-panel { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+.news-panel-hdr { padding:9px 13px; border-bottom:1px solid var(--border); font-family:var(--mono); font-size:13px; color:var(--text-faint); letter-spacing:.1em; }
+.news-list { padding:10px 13px; }
+.news-item { padding:8px 0; border-bottom:1px solid var(--border); }
+.news-item:last-child { border-bottom:none; padding-bottom:0; }
+.news-item:first-child { padding-top:0; }
+.news-hl { font-size:16px; color:var(--text); line-height:1.4; }
+.news-hl a { color:inherit; text-decoration:none; }
+.news-hl a:hover { color:var(--amber); }
+.news-meta { font-family:var(--mono); font-size:13px; color:var(--text-faint); margin-top:3px; }
+
+/* COMPANY TICKER INPUT */
+.ticker-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+.ticker-wrap { position:relative; }
+.ticker-prefix { position:absolute; left:10px; top:50%; transform:translateY(-50%); font-family:var(--mono); color:var(--text-faint); font-size:17px; pointer-events:none; }
+.ticker-field { background:var(--bg-card); border:1px solid var(--border-lt); color:var(--text); font-family:var(--mono); font-size:20px; font-weight:500; padding:8px 12px 8px 24px; border-radius:5px; width:120px; letter-spacing:.1em; text-transform:uppercase; outline:none; transition:border-color .15s; }
+.ticker-field::placeholder { color:var(--text-faint); font-size:15px; letter-spacing:.05em; }
+.ticker-field:focus { border-color:var(--amber); }
+.fetch-btn { background:var(--amber); color:#0A1118; border:none; font-family:var(--mono); font-size:15px; font-weight:500; letter-spacing:.1em; padding:9px 18px; border-radius:5px; cursor:pointer; transition:opacity .15s; }
+.fetch-btn:hover { opacity:.85; }
+.fetch-btn:disabled { opacity:.4; cursor:not-allowed; }
+.quick-chips { display:flex; gap:5px; align-items:center; }
+.ql { font-family:var(--mono); font-size:13px; color:var(--text-faint); }
+.qc { font-family:var(--mono); font-size:14px; padding:4px 9px; border:1px solid var(--border); border-radius:4px; background:none; color:var(--text-dim); cursor:pointer; transition:all .15s; }
+.qc:hover { border-color:var(--amber); color:var(--amber); }
+
+/* COMPANY HEADER */
+.co-hdr { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:start; padding-bottom:14px; border-bottom:1px solid var(--border); margin-bottom:16px; }
+.co-name { font-size:24px; font-weight:600; letter-spacing:-.01em; }
+.co-tags { display:flex; gap:6px; margin-top:5px; flex-wrap:wrap; }
+.co-tag { font-family:var(--mono); font-size:13px; color:var(--text-faint); background:var(--border); padding:2px 7px; border-radius:3px; }
+.price-col { text-align:right; }
+.price-main { font-family:var(--mono); font-size:30px; font-weight:500; }
+.price-chg { font-family:var(--mono); font-size:15px; margin-top:2px; }
+.price-chg.up { color:var(--green); } .price-chg.down { color:var(--red); }
+.price-range { font-family:var(--mono); font-size:13px; color:var(--text-faint); margin-top:4px; }
+
+/* FUNDAMENTALS TABLE */
+.fund-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }
+.fund-block { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+.fund-block-title { font-family:var(--mono); font-size:13px; letter-spacing:.1em; color:var(--text-faint); padding:8px 12px; border-bottom:1px solid var(--border); background:var(--bg-row); }
+.fund-row { display:flex; justify-content:space-between; align-items:center; padding:7px 12px; border-bottom:1px solid var(--border); }
+.fund-row:last-child { border-bottom:none; }
+.fund-key { font-size:15px; color:var(--text-dim); }
+.fund-val { font-family:var(--mono); font-size:15px; font-weight:500; }
+.fund-val.good { color:var(--green); } .fund-val.warn { color:var(--amber); } .fund-val.bad { color:var(--red); }
+.fund-val.neutral { color:var(--text); }
+
+/* ANALYST CONSENSUS */
+.consensus-bar { display:flex; gap:0; height:6px; border-radius:3px; overflow:hidden; margin:8px 0 4px; }
+.cb-buy { background:var(--green); }
+.cb-hold { background:var(--amber); }
+.cb-sell { background:var(--red); }
+.consensus-labels { display:flex; justify-content:space-between; font-family:var(--mono); font-size:13px; color:var(--text-faint); }
+.target-price { font-family:var(--mono); font-size:17px; font-weight:500; margin-top:8px; }
+.target-updown { font-family:var(--mono); font-size:14px; }
+
+/* 52W RANGE DISPLAY */
+.range-display { padding:10px 12px; }
+.range-labels { display:flex; justify-content:space-between; font-family:var(--mono); font-size:13px; color:var(--text-faint); margin-bottom:5px; }
+.range-bar { height:4px; background:var(--border); border-radius:2px; position:relative; }
+.range-bar-fill { height:100%; border-radius:2px; background:linear-gradient(90deg, var(--green), var(--amber)); position:absolute; left:0; }
+.range-cursor { width:8px; height:8px; border-radius:50%; background:var(--text); border:2px solid var(--bg-card); position:absolute; top:-2px; transform:translateX(-50%); }
+.range-pct { font-family:var(--mono); font-size:14px; color:var(--text-dim); margin-top:6px; text-align:center; }
+
+/* CO NEWS */
+.co-news-item { padding:9px 0; border-bottom:1px solid var(--border); }
+.co-news-item:last-child { border-bottom:none; }
+.co-news-item:first-child { padding-top:0; }
+.co-news-hl { font-size:16px; color:var(--text); line-height:1.4; }
+.co-news-hl a { color:inherit; text-decoration:none; }
+.co-news-hl a:hover { color:var(--amber); }
+.co-news-src { font-family:var(--mono); font-size:13px; color:var(--text-faint); margin-top:2px; }
+
+/* EMPTY / LOADING */
+.empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:260px; gap:8px; color:var(--text-faint); text-align:center; }
+.empty-icon { font-size:24px; opacity:.25; font-family:var(--mono); }
+.empty-ttl { font-family:var(--mono); font-size:14px; letter-spacing:.1em; color:var(--text-dim); }
+.empty-sub { font-size:15px; max-width:240px; line-height:1.5; }
+.loading-inline { display:flex; align-items:center; gap:8px; color:var(--text-faint); font-family:var(--mono); font-size:14px; padding:16px 0; }
+.sp { width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--amber); border-radius:50%; animation:spin .8s linear infinite; flex-shrink:0; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* SETUP */
+.setup-wrap { max-width:520px; }
+.setup-title { font-size:22px; font-weight:600; margin-bottom:4px; }
+.setup-sub { color:var(--text-dim); font-size:16px; margin-bottom:20px; line-height:1.6; }
+.setup-card { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; margin-bottom:10px; overflow:hidden; }
+.setup-card-hdr { padding:10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:var(--bg-row); }
+.setup-card-title { font-family:var(--mono); font-size:14px; letter-spacing:.08em; color:var(--text-dim); }
+.setup-card-body { padding:14px; }
+.setup-desc { font-size:15px; color:var(--text-dim); margin-bottom:10px; line-height:1.6; }
+.setup-desc a { color:var(--amber); text-decoration:none; }
+.setup-input-row { display:flex; gap:8px; }
+.setup-field { background:var(--bg-deep); border:1px solid var(--border-lt); color:var(--text); font-family:var(--mono); font-size:15px; padding:7px 10px; border-radius:4px; flex:1; outline:none; }
+.setup-field:focus { border-color:var(--amber); }
+.setup-field::placeholder { color:var(--text-faint); }
+.save-btn { background:var(--amber); color:#0A1118; border:none; font-family:var(--mono); font-size:14px; font-weight:500; padding:7px 14px; border-radius:4px; cursor:pointer; white-space:nowrap; }
+.cost-table { width:100%; border-collapse:collapse; font-size:15px; }
+.cost-table td { padding:7px 0; border-bottom:1px solid var(--border); }
+.cost-table tr:last-child td { border-bottom:none; }
+.cost-table .label { color:var(--text-dim); }
+.cost-table .val { font-family:var(--mono); text-align:right; }
+.cost-table .val.free { color:var(--green); }
+.cost-table .val.paid { color:var(--amber); }
+.cost-total { display:flex; justify-content:space-between; padding:10px 12px; background:var(--bg-deep); border-radius:5px; margin-top:8px; font-size:16px; border:1px solid var(--border); }
+.cost-total .val { font-family:var(--mono); color:var(--green); font-weight:500; }
+
+/* RECESSION INDICATORS */
+.rec-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+.rec-mini-chart { margin:10px 0 4px; width:100%; height:90px; }
+.rec-mini-chart svg { width:100%; height:100%; overflow:visible; }
+.rec-card { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:13px 15px; position:relative; overflow:hidden; }
+.rec-card::before { content:''; position:absolute; top:0; left:0; bottom:0; width:3px; }
+.rec-card.signal-clear::before { background:var(--green); }
+.rec-card.signal-warn::before { background:var(--amber); }
+.rec-card.signal-alert::before { background:var(--red); }
+.rec-card.signal-none::before { background:var(--text-faint); }
+.rec-type { font-family:var(--mono); font-size:12px; color:var(--text-faint); letter-spacing:.12em; margin-bottom:5px; }
+.rec-name { font-size:15px; font-weight:500; color:var(--text); margin-bottom:8px; line-height:1.3; }
+.rec-val { font-family:var(--mono); font-size:26px; font-weight:500; line-height:1; }
+.rec-val.clear { color:var(--green); }
+.rec-val.warn  { color:var(--amber); }
+.rec-val.alert { color:var(--red); }
+.rec-val.none  { color:var(--text-faint); }
+.rec-threshold { font-family:var(--mono); font-size:13px; color:var(--text-faint); margin-top:5px; }
+.rec-status { display:inline-flex; align-items:center; gap:5px; margin-top:8px; padding:3px 8px; border-radius:3px; font-family:var(--mono); font-size:13px; font-weight:500; letter-spacing:.06em; }
+.rec-status.clear { background:rgba(61,171,110,.12); color:var(--green); border:1px solid rgba(61,171,110,.25); }
+.rec-status.warn  { background:rgba(201,144,56,.12); color:var(--amber); border:1px solid rgba(201,144,56,.25); }
+.rec-status.alert { background:rgba(196,82,82,.12); color:var(--red); border:1px solid rgba(196,82,82,.25); }
+.rec-status.none  { background:rgba(62,80,96,.15); color:var(--text-faint); border:1px solid var(--border); }
+.rec-meta { font-size:14px; color:var(--text-dim); margin-top:6px; line-height:1.4; }
+.rec-note { font-size:14px; color:var(--text-faint); margin-top:4px; font-style:italic; }
+
+/* SCROLLABLE */
+.scrollable { max-height:280px; overflow-y:auto; }
+.scrollable::-webkit-scrollbar { width:3px; }
+.scrollable::-webkit-scrollbar-thumb { background:var(--border-lt); border-radius:2px; }
+
+
+/* MACRO LINE CHARTS */
+.chart-filter-bar{display:flex;gap:5px;margin-bottom:12px;}
+.cfpill{font-family:var(--mono);font-size:13px;padding:4px 10px;border:1px solid var(--border);border-radius:12px;background:none;color:var(--text-faint);cursor:pointer;transition:all .15s;}
+.cfpill.active{background:rgba(74,136,204,.2);color:var(--blue);border-color:rgba(74,136,204,.4);}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:12px 14px;}
+.chart-card-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.chart-card-title{font-family:var(--mono);font-size:13px;color:var(--text-faint);letter-spacing:.1em;}
+.chart-card-src{font-family:var(--mono);font-size:12px;color:var(--text-faint);margin-top:2px;}
+.chart-current-val{font-family:var(--mono);font-size:24px;font-weight:500;text-align:right;line-height:1;}
+.chart-current-note{font-family:var(--mono);font-size:13px;color:var(--text-faint);text-align:right;margin-top:3px;}
+.chart-svg-wrap{width:100%;height:120px;margin:4px 0;}
+.chart-svg-wrap svg{width:100%;height:100%;overflow:visible;}
+.chart-rec-legend{display:flex;gap:10px;margin-top:6px;}
+.chart-rec-item{display:flex;align-items:center;gap:4px;font-family:var(--mono);font-size:12px;color:var(--text-faint);}
+.rec-swatch{width:8px;height:8px;border-radius:2px;background:rgba(196,82,82,.2);border:1px solid rgba(196,82,82,.35);}
+
+/* PERFORMANCE TIME FILTER */
+.perf-filter-bar{display:flex;gap:5px;margin-bottom:8px;}
+.pfpill{font-family:var(--mono);font-size:13px;padding:4px 10px;border:1px solid var(--border);border-radius:12px;background:none;color:var(--text-faint);cursor:pointer;transition:all .15s;}
+.pfpill.active{background:var(--amber);color:#0A1118;border-color:var(--amber);}
+
+/* PEER COMPARISON COLUMNS */
+.fund-col-hdr{display:grid;grid-template-columns:1fr 68px 68px 68px;padding:5px 12px;gap:4px;border-bottom:1px solid var(--border);background:var(--bg-row);}
+.fund-col-hdr span{font-family:var(--mono);font-size:12px;color:var(--text-faint);text-align:right;}
+.fund-col-hdr span:first-child{text-align:left;}
+.h-ind{color:var(--blue) !important;}
+.h-peer{color:var(--purple) !important;}
+.fund-row{display:grid;grid-template-columns:1fr 68px 68px 68px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border);gap:4px;}
+.fund-row:last-child{border-bottom:none;}
+.fund-key{font-size:15px;color:var(--text-dim);}
+.fund-val{font-family:var(--mono);font-size:15px;font-weight:500;text-align:right;}
+.fund-val.good{color:var(--green);}
+.fund-val.warn{color:var(--amber);}
+.fund-val.bad{color:var(--red);}
+.fund-val.neutral{color:var(--text);}
+.fund-val.ind{color:var(--blue);font-weight:400;}
+.fund-val.peer{color:var(--purple);font-weight:400;}
+
+/* RESPONSIVE */
+@media(max-width:1100px){ .ind-grid{grid-template-columns:repeat(4,1fr);} .sector-grid{grid-template-columns:repeat(6,1fr);} }
+/* XBRL 10-K FINANCIALS */
+.xbrl-block { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-bottom:10px; }
+.xbrl-block-title { font-family:var(--mono); font-size:13px; letter-spacing:.12em; color:var(--text-faint); padding:8px 14px; background:var(--bg-row); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.xbrl-fy-labels { font-size:13px; color:var(--text-faint); margin-left:auto; letter-spacing:.05em; }
+.xbrl-col-hdr { display:grid; grid-template-columns:1fr 110px 110px 80px; padding:5px 14px 4px; gap:8px; }
+.xbrl-col-hdr span { font-family:var(--mono); font-size:12px; letter-spacing:.08em; color:var(--text-faint); text-align:right; }
+.xbrl-col-hdr span:first-child { text-align:left; }
+.xbrl-row { display:grid; grid-template-columns:1fr 110px 110px 80px; align-items:center; padding:6px 14px; border-bottom:1px solid var(--border); gap:8px; }
+.xbrl-row:last-child { border-bottom:none; }
+.xbrl-row.xbrl-top-line { background:rgba(255,255,255,.02); }
+.xbrl-row.xbrl-derived { background:rgba(255,255,255,.012); }
+.xbrl-row.xbrl-margin-row { padding-top:3px; padding-bottom:3px; background:rgba(0,0,0,.15); }
+.xbrl-key { font-size:15px; color:var(--text-dim); }
+.xbrl-row.xbrl-top-line .xbrl-key,
+.xbrl-row.xbrl-derived .xbrl-key { color:var(--text); font-weight:500; }
+.xbrl-fy1, .xbrl-fy0 { font-family:var(--mono); font-size:15px; color:var(--text); text-align:right; }
+.xbrl-row.xbrl-top-line .xbrl-fy1,
+.xbrl-row.xbrl-top-line .xbrl-fy0 { font-weight:500; }
+.xbrl-yoy { font-family:var(--mono); font-size:14px; text-align:right; color:var(--text-faint); }
+.xbrl-yoy.pos { color:var(--green); } .xbrl-yoy.neg { color:var(--red); }
+.xbrl-pct { font-family:var(--mono); font-size:14px; color:var(--text-dim); text-align:right; }
+.xbrl-delta { font-family:var(--mono); font-size:14px; text-align:right; }
+.xbrl-delta.pos { color:var(--green); } .xbrl-delta.neg { color:var(--red); }
+@media(max-width:800px){
+  .xbrl-row,.xbrl-col-hdr { grid-template-columns:1fr 90px 90px 60px; }
+  .ind-grid{grid-template-columns:repeat(2,1fr);}
+  .fred-grid{grid-template-columns:repeat(2,1fr);}
+  .sector-grid{grid-template-columns:repeat(3,1fr);}
+  .fund-grid{grid-template-columns:1fr;}
+  .news-grid{grid-template-columns:1fr;}
+  .co-hdr{grid-template-columns:1fr;}
+  .view{padding:12px;}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo"><em>MARKET</em>SATELLITE</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchView('macro',this)">Market Pulse</button>
+    <button class="nav-tab" onclick="switchView('company',this)">Company Data</button>
+    <button class="nav-tab" onclick="switchView('setup',this)">Setup</button>
+  </div>
+  <div class="nav-right">
+    <div class="nav-status"><span class="dot"></span><span id="nav-ts">—</span></div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════ MACRO VIEW ══════════════════════════════ -->
+<div class="view active" id="view-macro">
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="page-title">MARKET PULSE</span>
+      <span class="src-badge free">Yahoo Finance</span>
+      <span class="src-badge free">FRED</span>
+    </div>
+    <button class="refresh-btn" id="macro-refresh" onclick="loadAllMacro()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 4v6h6M23 20v-6h-6M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+      REFRESH ALL
+    </button>
+  </div>
+
+  <!-- MARKET INDICATORS -->
+  <div class="section">
+    <div class="section-hdr"><span class="section-title">MARKET INDICATORS</span></div>
+    <div class="ind-grid">
+      <div class="ind-card flat" id="c-sp500"><div class="ind-label">S&P 500</div><div class="ind-val" id="v-sp500">—</div><div class="ind-chg flat" id="g-sp500">—</div><div class="ind-sub">^GSPC</div></div>
+      <div class="ind-card flat" id="c-ndx"><div class="ind-label">NASDAQ 100</div><div class="ind-val" id="v-ndx">—</div><div class="ind-chg flat" id="g-ndx">—</div><div class="ind-sub">^NDX</div></div>
+      <div class="ind-card flat" id="c-dji"><div class="ind-label">DOW JONES</div><div class="ind-val" id="v-dji">—</div><div class="ind-chg flat" id="g-dji">—</div><div class="ind-sub">^DJI</div></div>
+      <div class="ind-card flat" id="c-vix"><div class="ind-label">VIX</div><div class="ind-val" id="v-vix">—</div><div class="ind-chg flat" id="g-vix">—</div><div class="ind-sub">Fear index</div></div>
+      <div class="ind-card flat" id="c-10y"><div class="ind-label">10Y TREASURY</div><div class="ind-val" id="v-10y">—</div><div class="ind-chg flat" id="g-10y">—</div><div class="ind-sub">^TNX</div></div>
+      <div class="ind-card flat" id="c-dxy"><div class="ind-label">USD INDEX</div><div class="ind-val" id="v-dxy">—</div><div class="ind-chg flat" id="g-dxy">—</div><div class="ind-sub">DX-Y.NYB</div></div>
+      <div class="ind-card flat" id="c-oil"><div class="ind-label">WTI CRUDE</div><div class="ind-val" id="v-oil">—</div><div class="ind-chg flat" id="g-oil">—</div><div class="ind-sub">CL=F</div></div>
+      <div class="ind-card flat" id="c-gold"><div class="ind-label">GOLD</div><div class="ind-val" id="v-gold">—</div><div class="ind-chg flat" id="g-gold">—</div><div class="ind-sub">GC=F</div></div>
+    </div>
+  </div>
+
+  <!-- MACRO ECONOMIC CHARTS -->
+  <div class="section">
+    <div class="section-hdr"><span class="section-title">MACRO ECONOMIC CHARTS — FRED</span><span id="chart-status" style="font-family:var(--mono);font-size:13px;color:var(--text-faint);margin-left:6px;"></span></div>
+    <div class="chart-filter-bar">
+      <button class="cfpill" onclick="setChartRange('1Y',this)">1Y</button>
+      <button class="cfpill" onclick="setChartRange('3Y',this)">3Y</button>
+      <button class="cfpill active" onclick="setChartRange('5Y',this)">5Y</button>
+      <button class="cfpill" onclick="setChartRange('10Y',this)">10Y</button>
+      <button class="cfpill" onclick="setChartRange('20Y',this)">20Y</button>
+      <button class="cfpill" onclick="setChartRange('Max',this)">Max</button>
+    </div>
+    <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-card-hdr">
+        <div><div class="chart-card-title">FED FUNDS RATE</div><div class="chart-card-src">FRED · FEDFUNDS</div></div>
+        <div><div class="chart-current-val" id="cv-ffr">—</div><div class="chart-current-note" id="cv-ffr-m">—</div></div>
+      </div>
+      <div class="chart-svg-wrap"><svg id="chart-ffr" viewBox="0 0 600 90" preserveAspectRatio="none"></svg></div>
+      <div class="chart-rec-legend"><div class="chart-rec-item"><div class="rec-swatch"></div>Recession period</div></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-hdr">
+        <div><div class="chart-card-title">CPI INFLATION (YoY %)</div><div class="chart-card-src">FRED · CPIAUCSL</div></div>
+        <div><div class="chart-current-val" id="cv-cpi">—</div><div class="chart-current-note">Fed target: 2.0%</div></div>
+      </div>
+      <div class="chart-svg-wrap"><svg id="chart-cpi" viewBox="0 0 600 90" preserveAspectRatio="none"></svg></div>
+      <div class="chart-rec-legend"><div class="chart-rec-item"><div class="rec-swatch"></div>Recession period</div></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-hdr">
+        <div><div class="chart-card-title">UNEMPLOYMENT RATE</div><div class="chart-card-src">FRED · UNRATE</div></div>
+        <div><div class="chart-current-val" id="cv-unemp">—</div><div class="chart-current-note" id="cv-unemp-m">—</div></div>
+      </div>
+      <div class="chart-svg-wrap"><svg id="chart-unemp" viewBox="0 0 600 90" preserveAspectRatio="none"></svg></div>
+      <div class="chart-rec-legend"><div class="chart-rec-item"><div class="rec-swatch"></div>Recession period</div></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-hdr">
+        <div><div class="chart-card-title">YIELD CURVE SPREAD (10Y−2Y)</div><div class="chart-card-src">FRED · T10Y2Y</div></div>
+        <div><div class="chart-current-val" id="cv-yc">—</div><div class="chart-current-note">0.00% = inversion threshold</div></div>
+      </div>
+      <div class="chart-svg-wrap"><svg id="chart-yc" viewBox="0 0 600 90" preserveAspectRatio="none"></svg></div>
+      <div class="chart-rec-legend"><div class="chart-rec-item"><div class="rec-swatch"></div>Recession period</div></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-hdr">
+        <div><div class="chart-card-title">REAL INCOME EX-TRANSFERS (YoY)</div><div class="chart-card-src">FRED · W875RX1</div></div>
+        <div><div class="chart-current-val" id="cv-income">—</div><div class="chart-current-note">Healthy: +2–3% YoY</div></div>
+      </div>
+      <div class="chart-svg-wrap"><svg id="chart-income" viewBox="0 0 600 90" preserveAspectRatio="none"></svg></div>
+      <div class="chart-rec-legend"><div class="chart-rec-item"><div class="rec-swatch"></div>Recession period</div></div>
+    </div>
+    </div><!-- /charts-grid -->
+    <div id="chart-no-key" style="display:none;font-size:15px;color:var(--text-faint);padding:4px 0;">Add a free FRED API key in <button onclick="switchViewName('setup')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:15px;font-family:var(--sans);">Setup</button> to enable live macro charts.</div>
+  </div>
+
+  <!-- FRED CURRENT VALUES -->
+  <div class="section">
+    <div class="section-hdr"><span class="section-title">ECONOMIC INDICATORS — FRED</span><span id="fred-status" style="font-family:var(--mono);font-size:13px;color:var(--text-faint);margin-left:6px;"></span></div>
+    <div class="fred-grid">
+      <div class="fred-card"><div class="fred-label">FED FUNDS RATE</div><div class="fred-val" id="fred-ffr">—</div><div class="fred-meta" id="fred-ffr-m">—</div></div>
+      <div class="fred-card"><div class="fred-label">CPI YoY INFLATION</div><div class="fred-val" id="fred-cpi">—</div><div class="fred-meta" id="fred-cpi-m">—</div></div>
+      <div class="fred-card"><div class="fred-label">UNEMPLOYMENT RATE</div><div class="fred-val" id="fred-unemp">—</div><div class="fred-meta" id="fred-unemp-m">—</div></div>
+      <div class="fred-card"><div class="fred-label">GDP GROWTH (QoQ)</div><div class="fred-val" id="fred-gdp">—</div><div class="fred-meta" id="fred-gdp-m">—</div></div>
+    </div>
+    <div id="fred-prompt" style="display:none;margin-top:8px;font-size:15px;color:var(--text-faint);">
+      Add a free FRED API key in <button onclick="switchViewName('setup')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:15px;font-family:var(--sans);">Setup</button> to enable live economic data. Free at <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank" style="color:var(--amber);text-decoration:none;">fred.stlouisfed.org</a>.
+    </div>
+  </div>
+
+  <!-- RECESSION INDICATORS -->
+  <div class="section">
+    <div class="section-hdr"><span class="section-title">RECESSION INDICATORS</span><span id="rec-status-line" style="font-family:var(--mono);font-size:13px;color:var(--text-faint);margin-left:6px;"></span></div>
+    <div class="chart-filter-bar">
+      <button class="cfpill" onclick="setRecRange('1Y',this)">1Y</button>
+      <button class="cfpill" onclick="setRecRange('3Y',this)">3Y</button>
+      <button class="cfpill active" onclick="setRecRange('5Y',this)">5Y</button>
+      <button class="cfpill" onclick="setRecRange('10Y',this)">10Y</button>
+      <button class="cfpill" onclick="setRecRange('20Y',this)">20Y</button>
+      <button class="cfpill" onclick="setRecRange('Max',this)">Max</button>
+    </div>
+    <div class="rec-grid">
+
+      <!-- 1. Yield Curve -->
+      <div class="rec-card signal-none" id="rc-yield">
+        <div class="rec-type">LEADING · 12–18 MO LEAD</div>
+        <div class="rec-name">Yield Curve<br>10Y − 2Y Spread</div>
+        <div class="rec-val none" id="rc-yield-val">—</div>
+        <div class="rec-threshold">Threshold: &lt; 0.00% = inverted</div>
+        <div class="rec-status none" id="rc-yield-status">— NO DATA</div>
+        <div class="rec-meta" id="rc-yield-meta">Fetching from Yahoo Finance (^TNX − ^IRX)</div>
+        <div class="rec-mini-chart"><svg id="rc-chart-yield" viewBox="0 0 600 70" preserveAspectRatio="none"></svg></div>
+        <div class="rec-note">Inverted before every recession since 1955. Watch for re-steepening after deep inversion.</div>
+      </div>
+
+      <!-- 2. Sahm Rule -->
+      <div class="rec-card signal-none" id="rc-sahm">
+        <div class="rec-type">COINCIDENT · REAL-TIME</div>
+        <div class="rec-name">Sahm Rule<br>Unemployment Δ vs 12-mo Low</div>
+        <div class="rec-val none" id="rc-sahm-val">—</div>
+        <div class="rec-threshold">Threshold: ≥ 0.50pp = triggered</div>
+        <div class="rec-status none" id="rc-sahm-status">— NO DATA</div>
+        <div class="rec-meta" id="rc-sahm-meta">Requires FRED key (SAHMREALTIME series)</div>
+        <div class="rec-mini-chart"><svg id="rc-chart-sahm" viewBox="0 0 600 70" preserveAspectRatio="none"></svg></div>
+        <div class="rec-note">Near-flawless real-time track record since 1970. Confirms recession is already starting.</div>
+      </div>
+
+      <!-- 3. Industrial Production: Manufacturing -->
+      <div class="rec-card signal-none" id="rc-ism">
+        <div class="rec-type">LEADING · 3–6 MO LEAD</div>
+        <div class="rec-name">Industrial Production<br>Manufacturing YoY %</div>
+        <div class="rec-val none" id="rc-ism-val">—</div>
+        <div class="rec-threshold">Positive = expansion · Negative = contraction</div>
+        <div class="rec-status none" id="rc-ism-status">— NO DATA</div>
+        <div class="rec-meta" id="rc-ism-meta">Requires FRED key (IPMAN series)</div>
+        <div class="rec-mini-chart"><svg id="rc-chart-ism" viewBox="0 0 600 70" preserveAspectRatio="none"></svg></div>
+        <div class="rec-note">Manufacturing output contraction leads broad recessions by 3–6 months. Sustained declines precede layoffs.</div>
+      </div>
+
+      <!-- 4. Real Personal Income ex-Transfers -->
+      <div class="rec-card signal-none" id="rc-income">
+        <div class="rec-type">COINCIDENT · NBER ANCHOR</div>
+        <div class="rec-name">Real Personal Income<br>ex-Transfer Payments (YoY)</div>
+        <div class="rec-val none" id="rc-income-val">—</div>
+        <div class="rec-threshold">Healthy: +2–3% · Negative = warning</div>
+        <div class="rec-status none" id="rc-income-status">— NO DATA</div>
+        <div class="rec-meta" id="rc-income-meta">Requires FRED key (W875RX1 series)</div>
+        <div class="rec-mini-chart"><svg id="rc-chart-income" viewBox="0 0 600 70" preserveAspectRatio="none"></svg></div>
+        <div class="rec-note">NBER's primary hard-data anchor. Strips gov't transfers to reveal true private income health.</div>
+      </div>
+
+    </div>
+    <div id="rec-fred-prompt" style="display:none;margin-top:8px;font-size:15px;color:var(--text-faint);">
+      ↑ Three of four recession indicators require a FRED key. Add one in <button onclick="switchViewName('setup')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:15px;font-family:var(--sans);">Setup</button> — free at <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank" style="color:var(--amber);text-decoration:none;">fred.stlouisfed.org</a>. Yield curve loads automatically from Yahoo Finance.
+    </div>
+  </div>
+
+  <!-- SECTOR PERFORMANCE -->
+  <div class="section">
+    <div class="section-hdr"><span class="section-title">SECTOR PERFORMANCE (ETF PROXIES)</span><span id="sector-period-label" style="font-family:var(--mono);font-size:13px;color:var(--text-faint);margin-left:6px;">1D</span></div>
+    <div class="perf-filter-bar">
+      <button class="pfpill active" onclick="setSectorFilter('1D',this)">1D</button>
+      <button class="pfpill" onclick="setSectorFilter('1W',this)">1W</button>
+      <button class="pfpill" onclick="setSectorFilter('1M',this)">1M</button>
+      <button class="pfpill" onclick="setSectorFilter('3M',this)">3M</button>
+      <button class="pfpill" onclick="setSectorFilter('6M',this)">6M</button>
+      <button class="pfpill" onclick="setSectorFilter('1Y',this)">1Y</button>
+      <button class="pfpill" onclick="setSectorFilter('5Y',this)">5Y</button>
+    </div>
+    <div class="sector-grid">
+      <div class="sector-cell"><div class="sector-name">TECH</div><div class="sector-pct flat" id="sc-xlk">—</div><div class="sector-etf">XLK</div></div>
+      <div class="sector-cell"><div class="sector-name">FINANCIALS</div><div class="sector-pct flat" id="sc-xlf">—</div><div class="sector-etf">XLF</div></div>
+      <div class="sector-cell"><div class="sector-name">HEALTHCARE</div><div class="sector-pct flat" id="sc-xlv">—</div><div class="sector-etf">XLV</div></div>
+      <div class="sector-cell"><div class="sector-name">ENERGY</div><div class="sector-pct flat" id="sc-xle">—</div><div class="sector-etf">XLE</div></div>
+      <div class="sector-cell"><div class="sector-name">CONSUMER DISC</div><div class="sector-pct flat" id="sc-xly">—</div><div class="sector-etf">XLY</div></div>
+      <div class="sector-cell"><div class="sector-name">CONSUMER STPL</div><div class="sector-pct flat" id="sc-xlp">—</div><div class="sector-etf">XLP</div></div>
+      <div class="sector-cell"><div class="sector-name">INDUSTRIALS</div><div class="sector-pct flat" id="sc-xli">—</div><div class="sector-etf">XLI</div></div>
+      <div class="sector-cell"><div class="sector-name">UTILITIES</div><div class="sector-pct flat" id="sc-xlu">—</div><div class="sector-etf">XLU</div></div>
+      <div class="sector-cell"><div class="sector-name">REAL ESTATE</div><div class="sector-pct flat" id="sc-xlre">—</div><div class="sector-etf">XLRE</div></div>
+      <div class="sector-cell"><div class="sector-name">MATERIALS</div><div class="sector-pct flat" id="sc-xlb">—</div><div class="sector-etf">XLB</div></div>
+      <div class="sector-cell"><div class="sector-name">COMM SERVICES</div><div class="sector-pct flat" id="sc-xlc">—</div><div class="sector-etf">XLC</div></div>
+    </div>
+  </div>
+
+  <!-- NEWS -->
+  <div class="section">
+    <div class="section-hdr"><span class="section-title">MARKET NEWS — YAHOO FINANCE</span></div>
+    <div class="news-grid">
+      <div class="news-panel">
+        <div class="news-panel-hdr">LATEST HEADLINES</div>
+        <div class="news-list scrollable" id="macro-news-1"><div class="loading-inline"><div class="sp"></div>Loading...</div></div>
+      </div>
+      <div class="news-panel">
+        <div class="news-panel-hdr">ECONOMY &amp; RATES</div>
+        <div class="news-list scrollable" id="macro-news-2"><div class="loading-inline"><div class="sp"></div>Loading...</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════ COMPANY VIEW ══════════════════════════════ -->
+<div class="view" id="view-company">
+
+  <div class="ticker-row">
+    <div class="ticker-wrap">
+      <span class="ticker-prefix">$</span>
+      <input class="ticker-field" id="ticker-input" placeholder="AAPL" maxlength="6"
+        onkeydown="if(event.key==='Enter')fetchCompany()"
+        oninput="this.value=this.value.toUpperCase()">
+    </div>
+    <button class="fetch-btn" id="fetch-btn" onclick="fetchCompany()">FETCH DATA</button>
+    <div class="quick-chips">
+      <span class="ql">QUICK:</span>
+      <button class="qc" onclick="qp('AAPL')">AAPL</button>
+      <button class="qc" onclick="qp('NVDA')">NVDA</button>
+      <button class="qc" onclick="qp('MSFT')">MSFT</button>
+      <button class="qc" onclick="qp('AMZN')">AMZN</button>
+      <button class="qc" onclick="qp('META')">META</button>
+      <button class="qc" onclick="qp('TSLA')">TSLA</button>
+      <button class="qc" onclick="qp('GOOGL')">GOOGL</button>
+    </div>
+  </div>
+
+  <div class="empty-state" id="co-empty">
+    <div class="empty-icon">[ ]</div>
+    <div class="empty-ttl">NO TICKER LOADED</div>
+    <div class="empty-sub">Enter a ticker to pull live price, fundamentals, analyst data, 52-week positioning, and recent news — all free from Yahoo Finance.</div>
+  </div>
+
+  <div id="co-loading" style="display:none;">
+    <div class="loading-inline"><div class="sp"></div><span id="co-loading-msg">Fetching data...</span></div>
+  </div>
+
+  <div id="co-result" style="display:none;">
+
+    <!-- Header -->
+    <div class="co-hdr">
+      <div>
+        <div class="co-name" id="co-name">—</div>
+        <div class="co-tags" id="co-tags"></div>
+      </div>
+      <div class="price-col">
+        <div class="price-main" id="co-price">—</div>
+        <div class="price-chg" id="co-pchg">—</div>
+        <div class="price-range" id="co-mktcap">—</div>
+      </div>
+    </div>
+
+    <!-- 52W Range -->
+    <div class="section">
+      <div class="section-hdr"><span class="section-title">52-WEEK POSITIONING</span></div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:6px;" class="range-display">
+        <div class="range-labels"><span id="w52-lo">—</span><span style="color:var(--text-dim);font-size:13px;font-family:var(--mono);">52-WEEK RANGE</span><span id="w52-hi">—</span></div>
+        <div class="range-bar"><div class="range-bar-fill" id="range-fill" style="width:50%"></div><div class="range-cursor" id="range-cursor" style="left:50%"></div></div>
+        <div class="range-pct" id="range-pct">—</div>
+      </div>
+    </div>
+
+    <!-- Fundamentals with peer comparison -->
+    <div class="section">
+      <div class="section-hdr"><span class="section-title">FUNDAMENTALS — YAHOO FINANCE</span><span id="peer-label" style="font-family:var(--mono);font-size:13px;color:var(--purple);margin-left:6px;"></span></div>
+      <div class="fund-grid">
+
+        <div class="fund-block">
+          <div class="fund-block-title">VALUATION</div>
+          <div class="fund-col-hdr"><span>METRIC</span><span id="fh-co1">CO</span><span class="h-ind">IND AVG</span><span class="h-peer" id="fh-peer1">PEER</span></div>
+          <div class="fund-row"><span class="fund-key">P/E (TTM)</span><span class="fund-val neutral" id="f-pe">—</span><span class="fund-val ind" id="f-pe-ind">—</span><span class="fund-val peer" id="f-pe-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">P/E (Forward)</span><span class="fund-val neutral" id="f-fpe">—</span><span class="fund-val ind" id="f-fpe-ind">—</span><span class="fund-val peer" id="f-fpe-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">PEG Ratio</span><span class="fund-val neutral" id="f-peg">—</span><span class="fund-val ind" id="f-peg-ind">—</span><span class="fund-val peer" id="f-peg-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">P/S Ratio</span><span class="fund-val neutral" id="f-ps">—</span><span class="fund-val ind" id="f-ps-ind">—</span><span class="fund-val peer" id="f-ps-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">P/B Ratio</span><span class="fund-val neutral" id="f-pb">—</span><span class="fund-val ind" id="f-pb-ind">—</span><span class="fund-val peer" id="f-pb-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">EV/EBITDA</span><span class="fund-val neutral" id="f-eveb">—</span><span class="fund-val ind" id="f-eveb-ind">—</span><span class="fund-val peer" id="f-eveb-peer">—</span></div>
+        </div>
+
+        <div class="fund-block">
+          <div class="fund-block-title">PROFITABILITY</div>
+          <div class="fund-col-hdr"><span>METRIC</span><span id="fh-co2">CO</span><span class="h-ind">IND AVG</span><span class="h-peer" id="fh-peer2">PEER</span></div>
+          <div class="fund-row"><span class="fund-key">EPS (TTM)</span><span class="fund-val neutral" id="f-eps">—</span><span class="fund-val ind" id="f-eps-ind">—</span><span class="fund-val peer" id="f-eps-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">Gross Margin</span><span class="fund-val neutral" id="f-gm">—</span><span class="fund-val ind" id="f-gm-ind">—</span><span class="fund-val peer" id="f-gm-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">Operating Margin</span><span class="fund-val neutral" id="f-om">—</span><span class="fund-val ind" id="f-om-ind">—</span><span class="fund-val peer" id="f-om-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">Profit Margin</span><span class="fund-val neutral" id="f-pm">—</span><span class="fund-val ind" id="f-pm-ind">—</span><span class="fund-val peer" id="f-pm-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">ROE</span><span class="fund-val neutral" id="f-roe">—</span><span class="fund-val ind" id="f-roe-ind">—</span><span class="fund-val peer" id="f-roe-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">ROA</span><span class="fund-val neutral" id="f-roa">—</span><span class="fund-val ind" id="f-roa-ind">—</span><span class="fund-val peer" id="f-roa-peer">—</span></div>
+        </div>
+
+        <div class="fund-block">
+          <div class="fund-block-title">BALANCE SHEET &amp; GROWTH</div>
+          <div class="fund-col-hdr"><span>METRIC</span><span id="fh-co3">CO</span><span class="h-ind">IND AVG</span><span class="h-peer" id="fh-peer3">PEER</span></div>
+          <div class="fund-row"><span class="fund-key">Revenue (TTM)</span><span class="fund-val neutral" id="f-rev">—</span><span class="fund-val ind" id="f-rev-ind">—</span><span class="fund-val peer" id="f-rev-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">Revenue Growth</span><span class="fund-val neutral" id="f-rg">—</span><span class="fund-val ind" id="f-rg-ind">—</span><span class="fund-val peer" id="f-rg-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">Free Cash Flow</span><span class="fund-val neutral" id="f-fcf">—</span><span class="fund-val ind" id="f-fcf-ind">—</span><span class="fund-val peer" id="f-fcf-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">Total Cash</span><span class="fund-val neutral" id="f-cash">—</span><span class="fund-val ind" id="f-cash-ind">—</span><span class="fund-val peer" id="f-cash-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">Total Debt</span><span class="fund-val neutral" id="f-debt">—</span><span class="fund-val ind" id="f-debt-ind">—</span><span class="fund-val peer" id="f-debt-peer">—</span></div>
+          <div class="fund-row"><span class="fund-key">Debt / Equity</span><span class="fund-val neutral" id="f-de">—</span><span class="fund-val ind" id="f-de-ind">—</span><span class="fund-val peer" id="f-de-peer">—</span></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Analyst Consensus -->
+    <div class="section">
+      <div class="section-hdr"><span class="section-title">ANALYST CONSENSUS</span></div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:14px 16px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <div style="font-family:var(--mono);font-size:13px;color:var(--text-faint);margin-bottom:6px;">RATINGS DISTRIBUTION</div>
+            <div class="consensus-bar">
+              <div class="cb-buy" id="cb-buy" style="width:0%"></div>
+              <div class="cb-hold" id="cb-hold" style="width:0%"></div>
+              <div class="cb-sell" id="cb-sell" style="width:0%"></div>
+            </div>
+            <div class="consensus-labels">
+              <span id="cl-buy">— BUY</span>
+              <span id="cl-hold">— HOLD</span>
+              <span id="cl-sell">— SELL</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-family:var(--mono);font-size:13px;color:var(--text-faint);margin-bottom:6px;">PRICE TARGET</div>
+            <div class="target-price" id="target-price">—</div>
+            <div class="target-updown" id="target-updown" style="color:var(--text-faint);">—</div>
+            <div style="font-family:var(--mono);font-size:13px;color:var(--text-faint);margin-top:4px;" id="target-range">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 10-K FINANCIALS (SEC EDGAR XBRL) ── -->
+    <div class="section" id="xbrl-section" style="display:none;">
+      <div class="section-hdr">
+        <span class="section-title">10-K FINANCIALS — SEC EDGAR XBRL</span>
+        <span style="font-family:var(--mono);font-size:13px;color:var(--green);margin-left:6px;">FREE · NO KEY REQUIRED</span>
+      </div>
+
+      <div id="xbrl-loading" style="display:none;">
+        <div class="loading-inline"><div class="sp"></div><span id="xbrl-loading-msg">Fetching from SEC EDGAR...</span></div>
+      </div>
+
+      <div id="xbrl-error" style="display:none;">
+        <div style="font-size:15px;color:var(--text-faint);padding:10px 0;" id="xbrl-error-msg"></div>
+      </div>
+
+      <div id="xbrl-result" style="display:none;">
+
+        <!-- Filing info bar -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-family:var(--mono);font-size:14px;color:var(--text-faint);" id="xbrl-filing-info"></div>
+          <a id="xbrl-edgar-link" href="#" target="_blank" style="font-family:var(--mono);font-size:13px;color:var(--amber);text-decoration:none;">View on EDGAR →</a>
+        </div>
+
+        <!-- Income Statement -->
+        <div class="xbrl-block">
+          <div class="xbrl-block-title">INCOME STATEMENT <span class="xbrl-fy-labels" id="xbrl-fy-labels"></span></div>
+          <div class="xbrl-row xbrl-top-line">
+            <span class="xbrl-key">Revenue</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-rev-fy1">—</span>
+            <span class="xbrl-fy0" id="x-rev-fy0">—</span>
+            <span class="xbrl-yoy" id="x-rev-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">Cost of Revenue</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-cogs-fy1">—</span>
+            <span class="xbrl-fy0" id="x-cogs-fy0">—</span>
+            <span class="xbrl-yoy" id="x-cogs-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-derived">
+            <span class="xbrl-key">Gross Profit</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-gp-fy1">—</span>
+            <span class="xbrl-fy0" id="x-gp-fy0">—</span>
+            <span class="xbrl-yoy" id="x-gp-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-margin-row">
+            <span class="xbrl-key" style="color:var(--text-faint);">Gross Margin %</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1 xbrl-pct" id="x-gm-fy1">—</span>
+            <span class="xbrl-fy0 xbrl-pct" id="x-gm-fy0">—</span>
+            <span class="xbrl-yoy xbrl-delta" id="x-gm-delta">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">R&amp;D Expense</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-rd-fy1">—</span>
+            <span class="xbrl-fy0" id="x-rd-fy0">—</span>
+            <span class="xbrl-yoy" id="x-rd-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">SG&amp;A Expense</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-sga-fy1">—</span>
+            <span class="xbrl-fy0" id="x-sga-fy0">—</span>
+            <span class="xbrl-yoy" id="x-sga-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-derived">
+            <span class="xbrl-key">Operating Income</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-oi-fy1">—</span>
+            <span class="xbrl-fy0" id="x-oi-fy0">—</span>
+            <span class="xbrl-yoy" id="x-oi-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-margin-row">
+            <span class="xbrl-key" style="color:var(--text-faint);">Operating Margin %</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1 xbrl-pct" id="x-om-fy1">—</span>
+            <span class="xbrl-fy0 xbrl-pct" id="x-om-fy0">—</span>
+            <span class="xbrl-yoy xbrl-delta" id="x-om-delta">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">Interest Expense</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-int-fy1">—</span>
+            <span class="xbrl-fy0" id="x-int-fy0">—</span>
+            <span class="xbrl-yoy" id="x-int-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-derived">
+            <span class="xbrl-key">Net Income</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-ni-fy1">—</span>
+            <span class="xbrl-fy0" id="x-ni-fy0">—</span>
+            <span class="xbrl-yoy" id="x-ni-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-margin-row">
+            <span class="xbrl-key" style="color:var(--text-faint);">Net Margin %</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1 xbrl-pct" id="x-nm-fy1">—</span>
+            <span class="xbrl-fy0 xbrl-pct" id="x-nm-fy0">—</span>
+            <span class="xbrl-yoy xbrl-delta" id="x-nm-delta">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">EPS (Diluted)</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-eps-fy1">—</span>
+            <span class="xbrl-fy0" id="x-eps-fy0">—</span>
+            <span class="xbrl-yoy" id="x-eps-yoy">—</span>
+          </div>
+        </div>
+
+        <!-- Cash Flow -->
+        <div class="xbrl-block">
+          <div class="xbrl-block-title">CASH FLOW</div>
+          <div class="xbrl-row xbrl-top-line">
+            <span class="xbrl-key">Operating Cash Flow</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-ocf-fy1">—</span>
+            <span class="xbrl-fy0" id="x-ocf-fy0">—</span>
+            <span class="xbrl-yoy" id="x-ocf-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">Capital Expenditures</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-capex-fy1">—</span>
+            <span class="xbrl-fy0" id="x-capex-fy0">—</span>
+            <span class="xbrl-yoy" id="x-capex-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-derived">
+            <span class="xbrl-key">Free Cash Flow</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-fcf-fy1">—</span>
+            <span class="xbrl-fy0" id="x-fcf-fy0">—</span>
+            <span class="xbrl-yoy" id="x-fcf-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-margin-row">
+            <span class="xbrl-key" style="color:var(--text-faint);">FCF Margin %</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1 xbrl-pct" id="x-fcfm-fy1">—</span>
+            <span class="xbrl-fy0 xbrl-pct" id="x-fcfm-fy0">—</span>
+            <span class="xbrl-yoy xbrl-delta" id="x-fcfm-delta">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">D&amp;A</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-da-fy1">—</span>
+            <span class="xbrl-fy0" id="x-da-fy0">—</span>
+            <span class="xbrl-yoy" id="x-da-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">Stock-Based Compensation</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-sbc-fy1">—</span>
+            <span class="xbrl-fy0" id="x-sbc-fy0">—</span>
+            <span class="xbrl-yoy" id="x-sbc-yoy">—</span>
+          </div>
+        </div>
+
+        <!-- Balance Sheet -->
+        <div class="xbrl-block">
+          <div class="xbrl-block-title">BALANCE SHEET <span style="font-size:13px;font-weight:400;color:var(--text-faint);">(most recent period)</span></div>
+          <div class="xbrl-row xbrl-top-line">
+            <span class="xbrl-key">Total Assets</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-ta-fy1">—</span>
+            <span class="xbrl-fy0" id="x-ta-fy0">—</span>
+            <span class="xbrl-yoy" id="x-ta-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">Cash &amp; Equivalents</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-cash-fy1">—</span>
+            <span class="xbrl-fy0" id="x-cash-fy0">—</span>
+            <span class="xbrl-yoy" id="x-cash-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">Total Debt</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-debt-fy1">—</span>
+            <span class="xbrl-fy0" id="x-debt-fy0">—</span>
+            <span class="xbrl-yoy" id="x-debt-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-derived">
+            <span class="xbrl-key">Net Cash / (Debt)</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-netcash-fy1">—</span>
+            <span class="xbrl-fy0" id="x-netcash-fy0">—</span>
+            <span class="xbrl-yoy" id="x-netcash-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">Shareholders' Equity</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-eq-fy1">—</span>
+            <span class="xbrl-fy0" id="x-eq-fy0">—</span>
+            <span class="xbrl-yoy" id="x-eq-yoy">—</span>
+          </div>
+          <div class="xbrl-row xbrl-margin-row">
+            <span class="xbrl-key" style="color:var(--text-faint);">Debt / Equity</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1 xbrl-pct" id="x-de-fy1">—</span>
+            <span class="xbrl-fy0 xbrl-pct" id="x-de-fy0">—</span>
+            <span class="xbrl-yoy xbrl-delta" id="x-de-delta">—</span>
+          </div>
+          <div class="xbrl-row xbrl-sub">
+            <span class="xbrl-key">Shares Outstanding (Diluted)</span>
+            <span class="xbrl-spacer"></span>
+            <span class="xbrl-fy1" id="x-sh-fy1">—</span>
+            <span class="xbrl-fy0" id="x-sh-fy0">—</span>
+            <span class="xbrl-yoy" id="x-sh-yoy">—</span>
+          </div>
+        </div>
+
+        <div style="font-family:var(--mono);font-size:13px;color:var(--text-faint);margin-top:4px;">
+          Source: SEC EDGAR XBRL Company Facts API · data.sec.gov · $0 · No API key required · Figures in USD
+        </div>
+      </div>
+    </div>
+    <!-- /xbrl-section -->
+
+    <!-- News (after XBRL) -->
+    <div class="section">
+      <div class="section-hdr"><span class="section-title">RECENT NEWS — YAHOO FINANCE</span></div>
+      <div class="news-panel">
+        <div class="news-list scrollable" id="co-news"></div>
+      </div>
+    </div>
+
+  </div><!-- /co-result -->
+</div>
+
+<!-- ══════════════════════════════ SETUP VIEW ══════════════════════════════ -->
+<div class="view" id="view-setup">
+  <div class="setup-wrap">
+    <div class="setup-title">Setup</div>
+    <div class="setup-sub">Signal runs entirely on free public data. No AI, no paid APIs, no accounts required.</div>
+
+    <div class="setup-card">
+      <div class="setup-card-hdr">
+        <span class="setup-card-title">FRED API KEY — ECONOMIC & RECESSION INDICATORS</span>
+        <span class="src-badge free">FREE</span>
+      </div>
+      <div class="setup-card-body">
+        <div class="setup-desc">
+          Unlocks Fed Funds Rate, CPI, unemployment, GDP, Sahm Rule, Industrial Production (Mfg), and Real Personal Income data from the St. Louis Federal Reserve. Free with instant signup — no billing required. <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank">Get a free key →</a>
+        </div>
+        <div class="setup-input-row">
+          <input class="setup-field" id="key-fred" type="text" placeholder="e.g. abcd1234efgh5678ijkl9012mnop3456">
+          <button class="save-btn" onclick="saveSetup()">SAVE</button>
+        </div>
+        <div id="setup-status" style="font-family:var(--mono);font-size:14px;margin-top:8px;color:var(--green);display:none;">✓ Key saved</div>
+      </div>
+    </div>
+
+    <div class="setup-card">
+      <div class="setup-card-hdr"><span class="setup-card-title">COMPLETE COST BREAKDOWN</span></div>
+      <div class="setup-card-body">
+        <table class="cost-table">
+          <tr><td class="label">Live market indicators (S&P 500, Nasdaq, Dow, VIX, bonds, commodities)</td><td class="val free">$0 — Yahoo Finance</td></tr>
+          <tr><td class="label">All 11 GICS sector ETF performance</td><td class="val free">$0 — Yahoo Finance</td></tr>
+          <tr><td class="label">Company price, 52-week range, market cap</td><td class="val free">$0 — Yahoo Finance</td></tr>
+          <tr><td class="label">Valuation ratios (P/E, PEG, P/S, P/B, EV/EBITDA)</td><td class="val free">$0 — Yahoo Finance</td></tr>
+          <tr><td class="label">Analyst consensus ratings &amp; price targets</td><td class="val free">$0 — Yahoo Finance</td></tr>
+          <tr><td class="label">News headlines (market + company)</td><td class="val free">$0 — Yahoo Finance</td></tr>
+          <tr><td class="label">Yield Curve (10Y − 2Y spread)</td><td class="val free">$0 — Yahoo Finance</td></tr>
+          <tr><td class="label">Fed Funds, CPI, unemployment, GDP</td><td class="val free">$0 — FRED (free key)</td></tr>
+          <tr><td class="label">Sahm Rule, Industrial Production (Mfg), Real Personal Income</td><td class="val free">$0 — FRED (free key)</td></tr>
+          <tr><td class="label">10-K financials: Income statement, cash flow, balance sheet</td><td class="val free">$0 — SEC EDGAR XBRL</td></tr>
+          <tr><td class="label">AI narrative / interpretation / recommendations</td><td class="val" style="color:var(--text-faint);">Not included</td></tr>
+        </table>
+        <div class="cost-total"><span>Total running cost</span><span class="val">$0.00</span></div>
+      </div>
+    </div>
+
+    <div style="font-size:15px;color:var(--text-faint);line-height:1.7;margin-top:4px;">
+      All data is fetched client-side directly from public APIs. Nothing is stored or transmitted to any third party. Keys saved in your browser's localStorage only.
+      Yahoo Finance endpoints are unofficial — if data shows dashes, visit <a href="https://finance.yahoo.com" target="_blank" style="color:var(--amber);">finance.yahoo.com</a> first to establish a session.
+      SEC EDGAR XBRL data reflects what companies have filed using standard US-GAAP taxonomy tags — availability varies by company.
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+// Use local proxy whenever served via HTTP (localhost or cloud); direct URLs only for file://
+const _proxy = location.protocol !== 'file:';
+const YF1 = _proxy ? '/api/yf1' : 'https://query1.finance.yahoo.com';
+const YF2 = _proxy ? '/api/yf2' : 'https://query2.finance.yahoo.com';
+const FRED_BASE = _proxy
+  ? '/api/fred'
+  : 'https://api.stlouisfed.org/fred/series/observations';
+const UA = {}; // User-Agent is a forbidden fetch header; proxy sets it server-side
+
+const getKey = k => localStorage.getItem('signal_' + k) || '';
+
+function fmt(n, d=2) {
+  if (n == null || isNaN(n)) return '—';
+  return Number(n).toLocaleString('en-US', { minimumFractionDigits:d, maximumFractionDigits:d });
+}
+function fmtB(n) {
+  if (!n || isNaN(n)) return '—';
+  if (Math.abs(n) >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
+  if (Math.abs(n) >= 1e9)  return '$' + (n/1e9).toFixed(1) + 'B';
+  if (Math.abs(n) >= 1e6)  return '$' + (n/1e6).toFixed(0) + 'M';
+  return '$' + fmt(n, 0);
+}
+function fmtPct(n) {
+  if (n == null || isNaN(n)) return '—';
+  return (n > 0 ? '+' : '') + fmt(n, 2) + '%';
+}
+function dir(n) { return n > 0.05 ? 'up' : n < -0.05 ? 'down' : 'flat'; }
+function timeAgo(ts) {
+  const m = Math.floor((Date.now() - ts * 1000) / 60000);
+  if (m < 60) return m + 'm ago';
+  if (m < 1440) return Math.floor(m/60) + 'h ago';
+  return Math.floor(m/1440) + 'd ago';
+}
+function setTS() {
+  const el = document.getElementById('nav-ts');
+  if (el) el.textContent = new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+}
+
+// ─── NAV ──────────────────────────────────────────────────────────────────────
+function switchView(v, el) {
+  document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(x => x.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  if (el) el.classList.add('active');
+}
+function switchViewName(v) {
+  document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(x => x.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t => { if(t.textContent.toLowerCase().includes(v)) t.classList.add('active'); });
+}
+
+// ─── YAHOO FINANCE ────────────────────────────────────────────────────────────
+async function yfQuote(symbols) {
+  const s = Array.isArray(symbols) ? symbols.join(',') : symbols;
+  const url = `${YF1}/v7/finance/quote?symbols=${encodeURIComponent(s)}&fields=regularMarketPrice,regularMarketChangePercent,regularMarketChange,shortName,longName,marketCap,fiftyTwoWeekLow,fiftyTwoWeekHigh`;
+  const r = await fetch(url, UA);
+  const d = await r.json();
+  const arr = d?.quoteResponse?.result || [];
+  const map = {};
+  arr.forEach(q => { map[q.symbol] = q; });
+  return map;
+}
+
+async function yfSummary(ticker) {
+  const mods = 'summaryDetail,financialData,defaultKeyStatistics,recommendationTrend';
+  const url = `${YF1}/v10/finance/quoteSummary/${ticker}?modules=${mods}`;
+  const r = await fetch(url, UA);
+  const d = await r.json();
+  return d?.quoteSummary?.result?.[0] || {};
+}
+
+async function yfNews(query) {
+  const url = `${YF2}/v1/finance/search?q=${encodeURIComponent(query)}&newsCount=8&quotesCount=0`;
+  const r = await fetch(url, UA);
+  const d = await r.json();
+  return d?.news || [];
+}
+
+// ─── FRED ────────────────────────────────────────────────────────────────────
+async function fetchFred(seriesId) {
+  const key = getKey('fred');
+  if (!key) return null;
+  const url = `${FRED_BASE}?series_id=${seriesId}&api_key=${key}&sort_order=desc&limit=2&file_type=json`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d?.error_message) throw new Error(d.error_message);
+  const obs = d?.observations || [];
+  return { current: obs[0], prior: obs[1] };
+}
+
+// ─── MACRO LOAD ───────────────────────────────────────────────────────────────
+async function loadAllMacro() {
+  const btn = document.getElementById('macro-refresh');
+  if (btn) btn.disabled = true;
+  setTS();
+
+  await Promise.all([
+    loadMarketIndicators(),
+    loadSectors(),
+    loadFredIndicators(),
+    loadRecessionIndicators(),
+    loadMacroNews()
+  ]);
+
+  if (btn) btn.disabled = false;
+}
+
+async function loadMarketIndicators() {
+  // ^IRX = 13-week T-bill, ^FVX = 5Y, ^TNX = 10Y, ^TYX = 30Y
+  // For 2Y we use the closest Yahoo proxy: ^IRX is 3mo, so we fetch both and compute 10Y-2Y via FRED if available
+  // Yahoo does have a 2Y: symbol is '^TU2YR' — but availability varies; we also store raw 10Y for yield curve
+  const syms = ['^GSPC','^NDX','^DJI','^VIX','^TNX','^IRX','DX-Y.NYB','CL=F','GC=F'];
+  const map = { '^GSPC':'sp500', '^NDX':'ndx', '^DJI':'dji', '^VIX':'vix', '^TNX':'10y', 'DX-Y.NYB':'dxy', 'CL=F':'oil', 'GC=F':'gold' };
+  const prefix = { 'CL=F':'$', 'GC=F':'$' };
+  const suffix = { '^TNX':'%', '^IRX':'%' };
+  const decimals = { '^GSPC':0, '^NDX':0, '^DJI':0, '^VIX':2, '^TNX':2, 'DX-Y.NYB':2, 'CL=F':2, 'GC=F':0 };
+
+  try {
+    const quotes = await yfQuote(syms);
+    // Store for yield curve calculation
+    window._yfRaw = window._yfRaw || {};
+    window._yfRaw['10y'] = quotes['^TNX']?.regularMarketPrice;
+    window._yfRaw['3mo'] = quotes['^IRX']?.regularMarketPrice; // fallback if 2Y unavailable
+
+    for (const [sym, id] of Object.entries(map)) {
+      const q = quotes[sym];
+      if (!q) continue;
+      const price = q.regularMarketPrice;
+      const chgPct = q.regularMarketChangePercent;
+      const d = dir(chgPct);
+      const pre = prefix[sym] || '';
+      const suf = suffix[sym] || '';
+      document.getElementById('v-' + id).textContent = pre + fmt(price, decimals[sym] ?? 2) + suf;
+      const gEl = document.getElementById('g-' + id);
+      gEl.textContent = fmtPct(chgPct);
+      gEl.className = 'ind-chg ' + d;
+      const cEl = document.getElementById('c-' + id);
+      cEl.className = 'ind-card ' + d;
+    }
+  } catch(e) { console.warn('Market indicators error:', e); }
+}
+
+async function loadSectors() {
+  const etfs = ['XLK','XLF','XLV','XLE','XLY','XLP','XLI','XLU','XLRE','XLB','XLC'];
+  const ids  = ['xlk','xlf','xlv','xle','xly','xlp','xli','xlu','xlre','xlb','xlc'];
+  await Promise.all(etfs.map(async (sym, i) => {
+    try {
+      const url = `${YF1}/v8/finance/chart/${sym}?range=2d&interval=1d`;
+      const r = await fetch(url, UA);
+      const d = await r.json();
+      const closes = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [];
+      const prev = closes.find(c => c != null);
+      const last = [...closes].reverse().find(c => c != null);
+      const el = document.getElementById('sc-' + ids[i]);
+      if (!el) return;
+      if (prev == null || last == null || prev === last) { el.textContent = '—'; return; }
+      const pct = ((last - prev) / prev) * 100;
+      el.textContent = fmtPct(pct);
+      el.className = 'sector-pct ' + dir(pct);
+    } catch(_) {
+      const el = document.getElementById('sc-' + ids[i]);
+      if (el) { el.textContent = '—'; el.className = 'sector-pct flat'; }
+    }
+  }));
+}
+
+async function loadFredIndicators() {
+  const key = getKey('fred');
+  const statusEl = document.getElementById('fred-status');
+  const promptEl = document.getElementById('fred-prompt');
+
+  if (!key) {
+    promptEl.style.display = 'block';
+    if (statusEl) statusEl.textContent = 'No key — add in Setup';
+    ['fred-ffr','fred-cpi','fred-unemp','fred-gdp'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+    ['fred-ffr-m','fred-cpi-m','fred-unemp-m','fred-gdp-m'].forEach(id => {
+      document.getElementById(id).textContent = 'Add FRED key in Setup';
+    });
+    return;
+  }
+
+  promptEl.style.display = 'none';
+  if (statusEl) statusEl.textContent = 'Loading from FRED...';
+
+  const setFred = (valId, metaId, data, suffix='', transform=null) => {
+    if (!data) { document.getElementById(valId).textContent = '—'; document.getElementById(metaId).textContent = 'No data'; return; }
+    const raw = parseFloat(data.current?.value);
+    const val = transform ? transform(raw) : raw;
+    document.getElementById(valId).textContent = isNaN(val) ? '—' : fmt(val, 2) + suffix;
+    const date = data.current?.date || '';
+    document.getElementById(metaId).textContent = 'As of ' + date;
+  };
+
+  try {
+    const [ffr, cpi, unemp, gdp] = await Promise.all([
+      fetchFred('FEDFUNDS'),
+      fetchFred('CPIAUCSL'),
+      fetchFred('UNRATE'),
+      fetchFred('A191RL1Q225SBEA')
+    ]);
+
+    setFred('fred-ffr', 'fred-ffr-m', ffr, '%');
+    // CPI: compute YoY manually if we have two readings
+    if (cpi?.current && cpi?.prior) {
+      const cur = parseFloat(cpi.current.value);
+      const pri = parseFloat(cpi.prior.value);
+      // FRED gives monthly; for YoY we'd need 12mo ago — show level for now
+      document.getElementById('fred-cpi').textContent = fmt(cur, 1);
+      document.getElementById('fred-cpi-m').textContent = 'Index · ' + (cpi.current.date || '');
+    } else setFred('fred-cpi', 'fred-cpi-m', cpi, '');
+    setFred('fred-unemp', 'fred-unemp-m', unemp, '%');
+    setFred('fred-gdp', 'fred-gdp-m', gdp, '%');
+
+    if (statusEl) statusEl.textContent = 'Updated ' + new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  } catch(e) {
+    if (statusEl) statusEl.textContent = 'FRED error — check key in Setup';
+    console.warn('FRED error:', e);
+  }
+}
+
+// ─── RECESSION INDICATORS ────────────────────────────────────────────────────
+
+function setRecCard(id, val, statusText, statusClass, meta) {
+  const card = document.getElementById('rc-' + id);
+  const valEl = document.getElementById('rc-' + id + '-val');
+  const stEl  = document.getElementById('rc-' + id + '-status');
+  const metaEl = document.getElementById('rc-' + id + '-meta');
+  if (!card || !valEl || !stEl) return;
+  card.className = 'rec-card signal-' + statusClass;
+  valEl.textContent = val;
+  valEl.className = 'rec-val ' + (statusClass === 'alert' ? 'alert' : statusClass === 'warn' ? 'warn' : statusClass === 'clear' ? 'clear' : 'none');
+  stEl.textContent = statusText;
+  stEl.className = 'rec-status ' + (statusClass === 'alert' ? 'alert' : statusClass === 'warn' ? 'warn' : statusClass === 'clear' ? 'clear' : 'none');
+  if (metaEl && meta) metaEl.textContent = meta;
+}
+
+async function fetchFredSeries(seriesId, limit = 14) {
+  const key = getKey('fred');
+  if (!key) return null;
+  const url = `${FRED_BASE}?series_id=${seriesId}&api_key=${key}&sort_order=desc&limit=${limit}&file_type=json`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d?.error_message) throw new Error(d.error_message);
+  return (d?.observations || []).map(o => ({ date: o.date, value: parseFloat(o.value) })).filter(o => !isNaN(o.value));
+}
+
+async function loadRecessionIndicators() {
+  const key = getKey('fred');
+  const promptEl = document.getElementById('rec-fred-prompt');
+  const statusLine = document.getElementById('rec-status-line');
+
+  // ── 1. YIELD CURVE (Yahoo Finance — no key needed) ──
+  try {
+    // We have 10Y from ^TNX; for 2Y we fetch ^TU2YR or fall back to FRED DGS2
+    const raw = window._yfRaw || {};
+    let y10 = raw['10y'];
+    let y2 = null;
+
+    // Try Yahoo 2Y directly
+    try {
+      const q2y = await yfQuote('^TU2YR');
+      const r = q2y['^TU2YR'];
+      if (r?.regularMarketPrice) y2 = r.regularMarketPrice;
+    } catch(_) {}
+
+    // Fallback: use FRED DGS2 if key available
+    if (y2 == null && key) {
+      try {
+        const dgs2 = await fetchFredSeries('DGS2', 1);
+        if (dgs2?.length) y2 = dgs2[0].value;
+      } catch(_) {}
+    }
+
+    if (y10 != null && y2 != null) {
+      const spread = y10 - y2;
+      const spreadFmt = (spread >= 0 ? '+' : '') + fmt(spread, 2) + '%';
+      const src = '10Y: ' + fmt(y10, 2) + '% · 2Y: ' + fmt(y2, 2) + '%';
+      if (spread < 0) {
+        // Inverted
+        const depth = Math.abs(spread);
+        const sc = depth > 0.5 ? 'alert' : 'warn';
+        setRecCard('yield', spreadFmt,
+          spread < -0.5 ? '⚠ DEEPLY INVERTED' : '⚠ INVERTED',
+          sc, src);
+      } else if (spread < 0.25) {
+        setRecCard('yield', spreadFmt, '△ FLATTENING', 'warn', src);
+      } else {
+        setRecCard('yield', spreadFmt, '✓ NORMAL', 'clear', src);
+      }
+    } else if (y10 != null) {
+      // Only have 10Y — show it with note
+      setRecCard('yield', fmt(y10,2) + '%', '— 2Y UNAVAILABLE', 'none', '10Y: ' + fmt(y10,2) + '% · Add FRED key for 2Y spread');
+    }
+  } catch(e) { console.warn('Yield curve error:', e); }
+
+  // ── 2–4 require FRED ──
+  if (!key) {
+    if (promptEl) promptEl.style.display = 'block';
+    if (statusLine) statusLine.textContent = 'Yield curve: live · Sahm/ISM/Income: add FRED key';
+    return;
+  }
+  if (promptEl) promptEl.style.display = 'none';
+
+  const [sahmRes, ismRes, incomeRes] = await Promise.allSettled([
+    fetchFredSeries('SAHMREALTIME', 3),
+    fetchFredSeries('IPMAN', 14),
+    fetchFredSeries('W875RX1', 14)
+  ]);
+
+  const sahmData   = sahmRes.status   === 'fulfilled' ? sahmRes.value   : null;
+  const ismData    = ismRes.status    === 'fulfilled' ? ismRes.value    : null;
+  const incomeData = incomeRes.status === 'fulfilled' ? incomeRes.value : null;
+
+  const fetchErrors = [
+    sahmRes.status   === 'rejected' ? 'SAHMREALTIME: ' + sahmRes.reason?.message   : null,
+    ismRes.status    === 'rejected' ? 'IPMAN: '     + ismRes.reason?.message    : null,
+    incomeRes.status === 'rejected' ? 'W875RX1: '      + incomeRes.reason?.message : null,
+  ].filter(Boolean);
+
+  if (fetchErrors.length) console.warn('Recession FRED partial error:', fetchErrors.join(' | '));
+
+  // ── 2. SAHM RULE ──
+  if (sahmData?.length) {
+    const latest = sahmData[0];
+    const v = latest.value;
+    let sc, st;
+    if (v >= 0.5)       { sc = 'alert'; st = '⚠ TRIGGERED — recession signal'; }
+    else if (v >= 0.3)  { sc = 'warn';  st = '△ ELEVATED — approaching threshold'; }
+    else                { sc = 'clear'; st = '✓ CLEAR — below threshold'; }
+    setRecCard('sahm', fmt(v, 2) + 'pp', st, sc, 'As of ' + latest.date + ' · FRED: SAHMREALTIME');
+  } else if (sahmRes.status === 'rejected') {
+    setRecCard('sahm', '—', '— FETCH ERROR', 'none', sahmRes.reason?.message || 'FRED error');
+  }
+
+  // ── 3. INDUSTRIAL PRODUCTION: MANUFACTURING (YoY %) ──
+  if (ismData?.length >= 13) {
+    const cur = ismData[0].value;
+    const yr  = ismData[12].value;
+    const yoy = ((cur - yr) / yr) * 100;
+    const yoyFmt = (yoy >= 0 ? '+' : '') + fmt(yoy, 1) + '%';
+    let sc, st;
+    if (yoy < -2)       { sc = 'alert'; st = '⚠ CONTRACTION — manufacturing output falling'; }
+    else if (yoy < 0)   { sc = 'warn';  st = '△ WEAK — below zero growth'; }
+    else                { sc = 'clear'; st = '✓ EXPANSION — positive output growth'; }
+    setRecCard('ism', yoyFmt, st, sc, 'YoY · Latest: ' + ismData[0].date + ' · FRED: IPMAN');
+  } else if (ismRes.status === 'rejected') {
+    setRecCard('ism', '—', '— FETCH ERROR', 'none', ismRes.reason?.message || 'FRED error');
+  } else if (ismData?.length) {
+    setRecCard('ism', fmt(ismData[0].value, 1), '— INSUFFICIENT HISTORY', 'none', 'Need 13 months of data for YoY');
+  }
+
+  // ── 4. REAL PERSONAL INCOME EX-TRANSFERS (YoY %) ──
+  if (incomeData?.length >= 13) {
+    const cur = incomeData[0].value;
+    const yr  = incomeData[12].value;
+    const yoy = ((cur - yr) / yr) * 100;
+    const yoyFmt = (yoy >= 0 ? '+' : '') + fmt(yoy, 1) + '%';
+    let sc, st;
+    if (yoy < 0)        { sc = 'alert'; st = '⚠ DECLINING — negative YoY growth'; }
+    else if (yoy < 1.5) { sc = 'warn';  st = '△ WEAK — below healthy 2–3% range'; }
+    else                { sc = 'clear'; st = '✓ HEALTHY — in normal range'; }
+    setRecCard('income', yoyFmt, st, sc, 'YoY · Latest: ' + incomeData[0].date + ' · FRED: W875RX1');
+  } else if (incomeRes.status === 'rejected') {
+    setRecCard('income', '—', '— FETCH ERROR', 'none', incomeRes.reason?.message || 'FRED error');
+  } else if (incomeData?.length) {
+    setRecCard('income', fmt(incomeData[0].value, 1), '— INSUFFICIENT HISTORY', 'none', 'Need 13 months of data for YoY');
+  }
+
+  // ── MINI CHARTS ──
+  drawRecCharts(activeRecRange);
+
+  // Summary status line
+  const signals = [];
+  ['yield','sahm','ism','income'].forEach(id => {
+    const el = document.getElementById('rc-' + id);
+    if (el?.classList.contains('signal-alert')) signals.push('alert');
+    else if (el?.classList.contains('signal-warn')) signals.push('warn');
+    else if (el?.classList.contains('signal-clear')) signals.push('clear');
+  });
+  const alerts = signals.filter(s => s === 'alert').length;
+  const warns  = signals.filter(s => s === 'warn').length;
+  if (statusLine) {
+    if (fetchErrors.length && !signals.length) {
+      statusLine.textContent = 'FRED error — check key in Setup';
+      statusLine.style.color = 'var(--red)';
+    } else {
+      if (alerts >= 2)       statusLine.textContent = '⚠ ' + alerts + ' of 4 indicators in alert — elevated recession risk';
+      else if (alerts === 1) statusLine.textContent = '△ 1 of 4 indicators in alert';
+      else if (warns >= 2)   statusLine.textContent = '△ ' + warns + ' of 4 indicators showing caution';
+      else                   statusLine.textContent = '✓ All indicators in normal range';
+      statusLine.style.color = alerts >= 2 ? 'var(--red)' : warns >= 1 ? 'var(--amber)' : 'var(--green)';
+      if (fetchErrors.length) statusLine.textContent += ' (some series unavailable)';
+    }
+  }
+}
+
+
+// ─── MACRO NEWS ───────────────────────────────────────────────────────────────
+async function loadMacroNews() {
+  const render = (elId, items) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (!items.length) { el.innerHTML = '<div style="color:var(--text-faint);font-size:15px;padding:8px 0;">No news loaded. Yahoo Finance may need a browser session — <a href="https://finance.yahoo.com" target="_blank" style="color:var(--amber);">open it</a> first.</div>'; return; }
+    el.innerHTML = items.map(n => `
+      <div class="news-item">
+        <div class="news-hl"><a href="${n.link||'#'}" target="_blank">${n.title}</a></div>
+        <div class="news-meta">${n.publisher||''} · ${n.providerPublishTime ? timeAgo(n.providerPublishTime) : ''}</div>
+      </div>`).join('');
+  };
+
+  try {
+    const [gen, econ] = await Promise.all([
+      yfNews('stock market today'),
+      yfNews('fed reserve inflation economy')
+    ]);
+    render('macro-news-1', gen.slice(0,5));
+    render('macro-news-2', econ.slice(0,5));
+  } catch(e) {
+    ['macro-news-1','macro-news-2'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<div style="color:var(--text-faint);font-size:15px;padding:8px 0;">Could not load news.</div>';
+    });
+  }
+}
+
+// ─── TICKER TAPE ──────────────────────────────────────────────────────────────
+// ─── MACRO CHARTS (FRED HISTORICAL) ──────────────────────────────────────────
+const REC_BANDS = [
+  {s:'1980-01-01',e:'1980-07-01'},{s:'1981-07-01',e:'1982-11-01'},
+  {s:'1990-07-01',e:'1991-03-01'},{s:'2001-03-01',e:'2001-11-01'},
+  {s:'2007-12-01',e:'2009-06-01'},{s:'2020-02-01',e:'2020-04-01'},
+];
+
+let fredHistoryCache = {};
+let activeCRange = '5Y';
+let activeRecRange = '5Y';
+
+async function fetchFredHistory(seriesId, limit = 600) {
+  const cacheKey = `${seriesId}:${limit}`;
+  if (fredHistoryCache[cacheKey]) return fredHistoryCache[cacheKey];
+  const key = getKey('fred');
+  if (!key) return null;
+  const url = `${FRED_BASE}?series_id=${seriesId}&api_key=${key}&sort_order=desc&limit=${limit}&file_type=json`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d?.error_message) throw new Error(d.error_message);
+  const obs = (d?.observations || [])
+    .map(o => ({ date: o.date, val: parseFloat(o.value) }))
+    .filter(o => !isNaN(o.val))
+    .reverse();
+  fredHistoryCache[cacheKey] = obs;
+  return obs;
+}
+
+function computeYoYSeries(series) {
+  return series.map((o, i) => {
+    const yr = o.date.slice(0,4), mo = o.date.slice(5,7);
+    const prevYear = (parseInt(yr) - 1).toString();
+    const targetMonth = prevYear + '-' + mo;
+    const prior = series.slice(0, i).reverse().find(p => p.date.slice(0,7) <= targetMonth);
+    if (!prior || prior.val === 0) return null;
+    return { date: o.date, val: ((o.val - prior.val) / Math.abs(prior.val)) * 100 };
+  }).filter(Boolean);
+}
+
+function sliceByRange(series, range) {
+  if (!series?.length) return [];
+  const now = new Date();
+  const cutoff = new Date(now);
+  if (range === '1Y')  cutoff.setFullYear(now.getFullYear() - 1);
+  else if (range === '3Y')  cutoff.setFullYear(now.getFullYear() - 3);
+  else if (range === '5Y')  cutoff.setFullYear(now.getFullYear() - 5);
+  else if (range === '10Y') cutoff.setFullYear(now.getFullYear() - 10);
+  else if (range === '20Y') cutoff.setFullYear(now.getFullYear() - 20);
+  else return series;
+  const cutStr = cutoff.toISOString().slice(0, 10);
+  return series.filter(o => o.date >= cutStr);
+}
+
+// Per-chart data store for hover handlers
+const CHART_SERIES = {};
+const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function _niceYTicks(mn, mx) {
+  if (mn === mx) { mn -= 1; mx += 1; }
+  const range = mx - mn, rough = range / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough || 1)));
+  const norm = rough / mag;
+  const step = mag * (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10);
+  const lo = Math.ceil(mn / step) * step;
+  const ticks = [];
+  for (let v = lo; v <= mx + step * 1e-9; v += step) ticks.push(+(v.toPrecision(10)));
+  return ticks;
+}
+
+function drawLineChart(svgId, series, opts = {}) {
+  const el = document.getElementById(svgId);
+  if (!el || !series?.length) return;
+
+  const W = 600, compact = !!opts.compact, H = opts.chartH || 120;
+  const PL = 46, PR = 8, PT = 8, PB = compact ? 6 : 22;
+  const CW = W - PL - PR, CH = H - PT - PB;
+  const color = opts.color || '#4A88CC';
+  const unit = opts.unit ?? '';
+
+  const vals = series.map(o => o.val);
+  const dates = series.map(o => new Date(o.date).getTime());
+  const ms0 = dates[0], msN = dates[dates.length - 1], tspan = msN - ms0 || 1;
+
+  let mn = Math.min(...vals), mx = Math.max(...vals);
+  if (mn === mx) { mn -= 1; mx += 1; }
+  if (opts.zeroLine) { mn = Math.min(mn, 0); mx = Math.max(mx, 0); }
+  if (opts.thresholdLine != null) { mn = Math.min(mn, opts.thresholdLine); mx = Math.max(mx, opts.thresholdLine); }
+  const vpad = (mx - mn) * 0.07; mn -= vpad; mx += vpad;
+
+  const sx = t => PL + ((t - ms0) / tspan) * CW;
+  const sy = v => PT + (1 - (v - mn) / (mx - mn)) * CH;
+  const yDec = opts.yDec ?? (Math.abs(mx - mn) < 0.5 ? 2 : Math.abs(mx - mn) < 10 ? 1 : 0);
+  const yFmt = v => (v === 0 ? '0' : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(yDec)) + unit;
+
+  el.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  el.style.cursor = 'crosshair';
+  let html = '';
+
+  // ── Y-AXIS: grid lines + labels ──────────────────────────────────────────────
+  _niceYTicks(mn, mx).forEach(v => {
+    const yp = sy(v);
+    if (yp < PT - 3 || yp > PT + CH + 3) return;
+    html += `<line x1="${PL}" y1="${yp.toFixed(1)}" x2="${W-PR}" y2="${yp.toFixed(1)}" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>`;
+    html += `<text x="${PL-5}" y="${yp.toFixed(1)}" text-anchor="end" dominant-baseline="middle" fill="rgba(160,190,208,0.65)" font-size="9" font-family="IBM Plex Mono,monospace">${yFmt(v)}</text>`;
+  });
+
+  // ── X-AXIS: date ticks + labels (full charts only) ───────────────────────────
+  if (!compact && series.length > 1) {
+    const rangeYrs = tspan / (365.25 * 24 * 3600 * 1000);
+    const im = rangeYrs <= 1.5 ? 3 : rangeYrs <= 3.5 ? 6 : rangeYrs <= 6 ? 12 : rangeYrs <= 12 ? 24 : rangeYrs <= 25 ? 60 : 120;
+    const showYear = rangeYrs > 3.5;
+    const s0d = new Date(series[0].date);
+    const tickStart = new Date(s0d.getFullYear(), Math.floor(s0d.getMonth() / im) * im, 1);
+    for (let d = new Date(tickStart); d.getTime() <= msN; d.setMonth(d.getMonth() + im)) {
+      const tms = d.getTime();
+      if (tms < ms0) continue;
+      const xp = sx(tms);
+      const lbl = showYear ? d.getFullYear().toString() : MO[d.getMonth()] + " '" + String(d.getFullYear()).slice(2);
+      html += `<line x1="${xp.toFixed(1)}" y1="${PT+CH}" x2="${xp.toFixed(1)}" y2="${PT+CH+4}" stroke="rgba(160,190,208,0.3)" stroke-width="0.75"/>`;
+      html += `<text x="${xp.toFixed(1)}" y="${PT+CH+14}" text-anchor="middle" fill="rgba(160,190,208,0.65)" font-size="9" font-family="IBM Plex Mono,monospace">${lbl}</text>`;
+    }
+  }
+
+  // ── RECESSION BANDS ──────────────────────────────────────────────────────────
+  REC_BANDS.forEach(b => {
+    const bs = new Date(b.s).getTime(), be = new Date(b.e).getTime();
+    if (be < ms0 || bs > msN) return;
+    const x1 = sx(Math.max(bs, ms0)), x2 = sx(Math.min(be, msN));
+    html += `<rect x="${x1.toFixed(1)}" y="${PT}" width="${Math.max(0,x2-x1).toFixed(1)}" height="${CH}" fill="rgba(196,82,82,0.15)" rx="1"/>`;
+  });
+
+  // ── REFERENCE LINES ──────────────────────────────────────────────────────────
+  if (opts.zeroLine && mn < 0 && mx > 0) {
+    const zy = sy(0);
+    html += `<line x1="${PL}" y1="${zy.toFixed(1)}" x2="${W-PR}" y2="${zy.toFixed(1)}" stroke="rgba(196,144,48,0.5)" stroke-width="0.75" stroke-dasharray="3,2"/>`;
+  }
+  if (opts.thresholdLine != null) {
+    const ty = sy(opts.thresholdLine);
+    if (ty >= PT && ty <= PT + CH)
+      html += `<line x1="${PL}" y1="${ty.toFixed(1)}" x2="${W-PR}" y2="${ty.toFixed(1)}" stroke="rgba(196,82,82,0.6)" stroke-width="1" stroke-dasharray="4,3"/>`;
+  }
+
+  // ── DATA LINE + FILL ─────────────────────────────────────────────────────────
+  const pathD = series.map((o, i) => `${i===0?'M':'L'}${sx(dates[i]).toFixed(1)},${sy(o.val).toFixed(1)}`).join(' ');
+  html += `<path d="${pathD} L${sx(msN).toFixed(1)},${PT+CH} L${PL},${PT+CH} Z" fill="${color}" fill-opacity="0.08"/>`;
+  html += `<path d="${pathD}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const lx = sx(msN).toFixed(1), ly = sy(vals[vals.length-1]).toFixed(1);
+  html += `<circle cx="${lx}" cy="${ly}" r="2.5" fill="${color}"/>`;
+  html += `<circle cx="${lx}" cy="${ly}" r="5" fill="${color}" fill-opacity="0.18"/>`;
+
+  // ── HOVER GROUP (hidden; updated by _chartHover) ─────────────────────────────
+  html += `<g class="ch" visibility="hidden">
+    <line class="ch-x" x1="${PL}" y1="${PT}" x2="${PL}" y2="${PT+CH}" stroke="rgba(255,255,255,0.28)" stroke-width="0.75" stroke-dasharray="3,2"/>
+    <circle class="ch-dot" cx="${PL}" cy="${PT}" r="3" fill="${color}" stroke="#0C1620" stroke-width="1.5"/>
+    <rect class="ch-bg" x="${PL}" y="${PT}" width="80" height="30" rx="3" fill="rgba(8,15,24,0.92)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+    <text class="ch-d" x="${PL+6}" y="${PT+11}" fill="rgba(160,190,208,0.9)" font-size="9" font-family="IBM Plex Mono,monospace"></text>
+    <text class="ch-v" x="${PL+6}" y="${PT+24}" fill="#F0EDE6" font-size="11" font-family="IBM Plex Mono,monospace" font-weight="600"></text>
+  </g>`;
+
+  el.innerHTML = html;
+  CHART_SERIES[svgId] = { series, dates, mn, mx, PL, PT, CW, CH, W, unit, yDec };
+  el.onmousemove = e => _chartHover(e, svgId);
+  el.onmouseleave = () => _chartLeave(svgId);
+}
+
+function _chartHover(e, id) {
+  const d = CHART_SERIES[id];
+  if (!d) return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  const hg = el.querySelector('.ch');
+  if (!hg) return;
+  const r = el.getBoundingClientRect();
+  const mx = (e.clientX - r.left) / r.width * d.W;
+  if (mx < d.PL || mx > d.PL + d.CW) { hg.setAttribute('visibility', 'hidden'); return; }
+  const ms0 = d.dates[0], msN = d.dates[d.dates.length - 1];
+  const tgt = ms0 + ((mx - d.PL) / d.CW) * (msN - ms0);
+  let bi = 0, bd = Infinity;
+  d.dates.forEach((t, i) => { const dist = Math.abs(t - tgt); if (dist < bd) { bd = dist; bi = i; } });
+  const pt = d.series[bi];
+  const px = d.PL + ((d.dates[bi] - ms0) / (msN - ms0 || 1)) * d.CW;
+  const py = d.PT + (1 - (pt.val - d.mn) / (d.mx - d.mn)) * d.CH;
+  hg.setAttribute('visibility', 'visible');
+  const xLine = hg.querySelector('.ch-x');
+  if (xLine) { xLine.setAttribute('x1', px.toFixed(1)); xLine.setAttribute('x2', px.toFixed(1)); }
+  const dot = hg.querySelector('.ch-dot');
+  if (dot) { dot.setAttribute('cx', px.toFixed(1)); dot.setAttribute('cy', py.toFixed(1)); }
+  const yFmt = v => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(d.yDec)) + d.unit;
+  const dt = new Date(pt.date);
+  const dStr = MO[dt.getMonth()] + ' ' + dt.getFullYear();
+  const vStr = yFmt(pt.val);
+  const tDate = hg.querySelector('.ch-d'), tVal = hg.querySelector('.ch-v');
+  if (tDate) tDate.textContent = dStr;
+  if (tVal) tVal.textContent = vStr;
+  const tipW = Math.max(dStr.length, vStr.length) * 6.2 + 14;
+  const tipH = 30;
+  let tx = px + 8, ty = py - tipH - 6;
+  if (tx + tipW > d.W - 8) tx = px - tipW - 8;
+  if (ty < d.PT) ty = py + 8;
+  const bg = hg.querySelector('.ch-bg');
+  if (bg) { bg.setAttribute('x', tx.toFixed(1)); bg.setAttribute('y', ty.toFixed(1)); bg.setAttribute('width', tipW.toFixed(1)); bg.setAttribute('height', tipH.toFixed(1)); }
+  const tdx = (tx + 6).toFixed(1);
+  if (tDate) { tDate.setAttribute('x', tdx); tDate.setAttribute('y', (ty + 11).toFixed(1)); }
+  if (tVal)  { tVal.setAttribute('x', tdx); tVal.setAttribute('y', (ty + 24).toFixed(1)); }
+}
+
+function _chartLeave(id) {
+  const hg = document.getElementById(id)?.querySelector('.ch');
+  if (hg) hg.setAttribute('visibility', 'hidden');
+}
+
+async function drawMacroCharts(range) {
+  activeCRange = range;
+  const key = getKey('fred');
+  const noKeyEl = document.getElementById('chart-no-key');
+  const statusEl = document.getElementById('chart-status');
+  if (!key) {
+    if (noKeyEl) noKeyEl.style.display = 'block';
+    if (statusEl) statusEl.textContent = 'Sample data · add FRED key for live charts';
+    drawPlaceholderCharts(range, ['macro']);
+    return;
+  }
+  if (noKeyEl) noKeyEl.style.display = 'none';
+  if (statusEl) statusEl.textContent = 'Loading...';
+  try {
+    const [ffrD, cpiD, unempD, ycD, incD] = await Promise.all([
+      fetchFredHistory('FEDFUNDS'),
+      fetchFredHistory('CPIAUCSL'),
+      fetchFredHistory('UNRATE'),
+      fetchFredHistory('T10Y2Y', 12500), // daily since 1976 — ~12500 records for full history
+      fetchFredHistory('W875RX1'),
+    ]);
+    const cpiYoY = computeYoYSeries(cpiD || []);
+    const incYoY = computeYoYSeries(incD || []);
+    drawLineChart('chart-ffr',    sliceByRange(ffrD, range),   { color:'#4A88CC', unit:'%', yDec:2 });
+    drawLineChart('chart-cpi',    sliceByRange(cpiYoY, range), { color:'#C49030', unit:'%', yDec:1 });
+    drawLineChart('chart-unemp',  sliceByRange(unempD, range), { color:'#8B6FD4', unit:'%', yDec:1 });
+    drawLineChart('chart-yc',     sliceByRange(ycD, range),    { color:'#C45252', zeroLine:true, unit:'%', yDec:2 });
+    drawLineChart('chart-income', sliceByRange(incYoY, range), { color:'#3DAB6E', zeroLine:true, unit:'%', yDec:1 });
+    // Update current-value labels from cached data
+    const last = arr => arr?.length ? arr[arr.length-1].val : null;
+    const setCV = (id, v, suf='%', dec=2) => { const el = document.getElementById(id); if(el) el.textContent = v!=null ? (v>0&&suf!='%'?'':'')+fmt(v,dec)+suf : '—'; };
+    setCV('cv-ffr',   last(ffrD));
+    const cpiLast = last(cpiYoY);
+    const cvCpi = document.getElementById('cv-cpi');
+    if (cvCpi) cvCpi.textContent = cpiLast != null ? fmt(cpiLast, 1) + '%' : '—';
+    setCV('cv-unemp', last(unempD));
+    const cvYc = document.getElementById('cv-yc');
+    const ycLast = last(ycD);
+    if (cvYc) { cvYc.textContent = ycLast != null ? (ycLast >= 0 ? '+' : '') + fmt(ycLast, 2) + '%' : '—'; cvYc.style.color = ycLast < 0 ? 'var(--amber)' : 'var(--text)'; }
+    const incLast = last(incYoY);
+    const cvInc = document.getElementById('cv-income');
+    if (cvInc) { cvInc.textContent = incLast != null ? (incLast >= 0 ? '+' : '') + fmt(incLast, 1) + '%' : '—'; cvInc.style.color = incLast < 0 ? 'var(--red)' : incLast < 1.5 ? 'var(--amber)' : 'var(--green)'; }
+    if (statusEl) statusEl.textContent = 'Updated ' + new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  } catch(e) {
+    if (statusEl) statusEl.textContent = 'Error: ' + (e.message || e);
+    console.warn('Chart error:', e);
+  }
+}
+
+function setChartRange(range, el) {
+  el.closest('.chart-filter-bar').querySelectorAll('.cfpill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  drawMacroCharts(range);
+}
+
+async function drawRecCharts(range) {
+  const key = getKey('fred');
+  if (!key) { drawPlaceholderCharts(range, ['rec']); return; }
+  const [ycRes, sahmRes2, ipmanRes, incRes] = await Promise.allSettled([
+    fetchFredHistory('T10Y2Y', 12500),  // daily since 1976 — full history
+    fetchFredHistory('SAHMREALTIME'),
+    fetchFredHistory('IPMAN'),
+    fetchFredHistory('W875RX1'),
+  ]);
+  const ok = res => res.status === 'fulfilled' ? (res.value || []) : [];
+  const r = arr => sliceByRange(arr, range);
+  const CH = 90;
+  drawLineChart('rc-chart-yield',  r(ok(ycRes)),                          { color:'#C45252', zeroLine:true,     chartH:CH, compact:true, unit:'%', yDec:2 });
+  drawLineChart('rc-chart-sahm',   r(ok(sahmRes2)),                       { color:'#8B6FD4', thresholdLine:0.5, chartH:CH, compact:true, unit:'',  yDec:2 });
+  drawLineChart('rc-chart-ism',    r(computeYoYSeries(ok(ipmanRes))),      { color:'#C49030', zeroLine:true,     chartH:CH, compact:true, unit:'%', yDec:1 });
+  drawLineChart('rc-chart-income', r(computeYoYSeries(ok(incRes))),        { color:'#3DAB6E', zeroLine:true,     chartH:CH, compact:true, unit:'%', yDec:1 });
+}
+
+function setRecRange(range, el) {
+  el.closest('.chart-filter-bar').querySelectorAll('.cfpill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  activeRecRange = range;
+  drawRecCharts(range);
+}
+
+// ─── SECTOR TIME FILTER ───────────────────────────────────────────────────────
+let activeSectorPeriod = '1D';
+
+async function setSectorFilter(period, el) {
+  document.querySelectorAll('.pfpill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  activeSectorPeriod = period;
+  const lbl = document.getElementById('sector-period-label');
+  if (lbl) lbl.textContent = period;
+  const etfs = ['XLK','XLF','XLV','XLE','XLY','XLP','XLI','XLU','XLRE','XLB','XLC'];
+  const ids  = ['xlk','xlf','xlv','xle','xly','xlp','xli','xlu','xlre','xlb','xlc'];
+  etfs.forEach((sym, i) => {
+    const el2 = document.getElementById('sc-' + ids[i]);
+    if (el2) { el2.textContent = '…'; el2.className = 'sector-pct flat'; }
+  });
+  const rangeMap = {'1D':'2d','1W':'5d','1M':'1mo','3M':'3mo','6M':'6mo','1Y':'1y','5Y':'5y'};
+  const yfRange = rangeMap[period] || '1y';
+  await Promise.all(etfs.map(async (sym, i) => {
+    try {
+      const url = `${YF1}/v8/finance/chart/${sym}?range=${yfRange}&interval=1d`;
+      const r = await fetch(url, UA);
+      const d = await r.json();
+      const result = d?.chart?.result?.[0];
+      const closes = result?.indicators?.quote?.[0]?.close || [];
+      const first = closes.find(c => c != null);
+      const last = [...closes].reverse().find(c => c != null);
+      const el2 = document.getElementById('sc-' + ids[i]);
+      if (!el2) return;
+      if (first == null || last == null) { el2.textContent = '—'; return; }
+      const pct = ((last - first) / first) * 100;
+      el2.textContent = fmtPct(pct);
+      el2.className = 'sector-pct ' + dir(pct);
+    } catch(_) {
+      const el2 = document.getElementById('sc-' + ids[i]);
+      if (el2) { el2.textContent = '—'; el2.className = 'sector-pct flat'; }
+    }
+  }));
+}
+
+// ─── PEER COMPARISON ─────────────────────────────────────────────────────────
+const PEER_MAP = {
+  'AAPL':'MSFT','NVDA':'AMD','MSFT':'AAPL','AMZN':'GOOGL',
+  'META':'GOOGL','TSLA':'F','GOOGL':'META','AMD':'NVDA',
+  'NFLX':'DIS','JPM':'GS','WMT':'COST','V':'MA',
+};
+
+function setPeerVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val ?? '—';
+}
+
+async function loadPeerData(peerTicker, coTicker) {
+  // Update column headers
+  ['fh-peer1','fh-peer2','fh-peer3'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = peerTicker; });
+  ['fh-co1','fh-co2','fh-co3'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = coTicker; });
+  const lbl = document.getElementById('peer-label');
+  if (lbl) lbl.textContent = '· vs ' + peerTicker;
+  // Reset peer cells
+  const peerIds = ['pe','fpe','peg','ps','pb','eveb','eps','gm','om','pm','roe','roa','rev','rg','fcf','cash','debt','de'];
+  peerIds.forEach(id => setPeerVal('f-' + id + '-peer', '…'));
+  try {
+    const ps = await yfSummary(peerTicker);
+    const sd = ps?.summaryDetail || {};
+    const fd = ps?.financialData || {};
+    const ks = ps?.defaultKeyStatistics || {};
+    setPeerVal('f-pe-peer',   sd.trailingPE?.raw   != null ? fmt(sd.trailingPE.raw, 1) + 'x' : null);
+    setPeerVal('f-fpe-peer',  sd.forwardPE?.raw    != null ? fmt(sd.forwardPE.raw, 1) + 'x' : null);
+    setPeerVal('f-peg-peer',  ks.pegRatio?.raw     != null ? fmt(ks.pegRatio.raw, 2) : null);
+    setPeerVal('f-ps-peer',   sd.priceToSalesTrailing12Months?.raw != null ? fmt(sd.priceToSalesTrailing12Months.raw, 2) + 'x' : null);
+    setPeerVal('f-pb-peer',   sd.priceToBook?.raw  != null ? fmt(sd.priceToBook.raw, 2) + 'x' : null);
+    setPeerVal('f-eveb-peer', ks.enterpriseToEbitda?.raw != null ? fmt(ks.enterpriseToEbitda.raw, 1) + 'x' : null);
+    setPeerVal('f-eps-peer',  ks.trailingEps?.raw  != null ? '$' + fmt(ks.trailingEps.raw) : null);
+    setPeerVal('f-gm-peer',   fd.grossMargins?.raw    != null ? fmtPct(fd.grossMargins.raw * 100) : null);
+    setPeerVal('f-om-peer',   fd.operatingMargins?.raw != null ? fmtPct(fd.operatingMargins.raw * 100) : null);
+    setPeerVal('f-pm-peer',   fd.profitMargins?.raw  != null ? fmtPct(fd.profitMargins.raw * 100) : null);
+    setPeerVal('f-roe-peer',  fd.returnOnEquity?.raw  != null ? fmtPct(fd.returnOnEquity.raw * 100) : null);
+    setPeerVal('f-roa-peer',  fd.returnOnAssets?.raw  != null ? fmtPct(fd.returnOnAssets.raw * 100) : null);
+    setPeerVal('f-rev-peer',  fmtB(fd.totalRevenue?.raw));
+    setPeerVal('f-rg-peer',   fd.revenueGrowth?.raw   != null ? fmtPct(fd.revenueGrowth.raw * 100) : null);
+    setPeerVal('f-fcf-peer',  fmtB(fd.freeCashflow?.raw));
+    setPeerVal('f-cash-peer', fmtB(fd.totalCash?.raw));
+    setPeerVal('f-debt-peer', fmtB(fd.totalDebt?.raw));
+    setPeerVal('f-de-peer',   fd.debtToEquity?.raw    != null ? fmt(fd.debtToEquity.raw / 100, 2) + 'x' : null);
+    // Clear industry avg (no free source — show dashes)
+    peerIds.forEach(id => setPeerVal('f-' + id + '-ind', '—'));
+  } catch(e) {
+    console.warn('Peer data error:', e);
+    peerIds.forEach(id => setPeerVal('f-' + id + '-peer', '—'));
+  }
+}
+
+// ─── COMPANY ─────────────────────────────────────────────────────────────────
+function qp(t) { document.getElementById('ticker-input').value = t; fetchCompany(); }
+
+async function fetchCompany() {
+  const ticker = document.getElementById('ticker-input').value.trim().toUpperCase();
+  if (!ticker) return;
+
+  document.getElementById('co-empty').style.display = 'none';
+  document.getElementById('co-result').style.display = 'none';
+  document.getElementById('co-loading').style.display = 'block';
+  document.getElementById('fetch-btn').disabled = true;
+
+  const setMsg = m => { const el = document.getElementById('co-loading-msg'); if(el) el.textContent = m; };
+
+  setMsg('Fetching price & fundamentals...');
+  let quotes = {}, summary = {}, news = [];
+  try { quotes = await yfQuote(ticker); } catch(e) { console.warn(e); }
+  setMsg('Fetching detailed financials...');
+  try { summary = await yfSummary(ticker); } catch(e) { console.warn(e); }
+  setMsg('Fetching news...');
+  try { news = await yfNews(ticker); } catch(e) { console.warn(e); }
+
+  document.getElementById('co-loading').style.display = 'none';
+  document.getElementById('fetch-btn').disabled = false;
+
+  renderCompany(ticker, quotes[ticker] || null, summary, news);
+
+  // Load peer data non-blocking
+  const peer = PEER_MAP[ticker];
+  if (peer) loadPeerData(peer, ticker);
+  else {
+    ['fh-peer1','fh-peer2','fh-peer3'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = 'PEER'; });
+    ['fh-co1','fh-co2','fh-co3'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = ticker; });
+    const lbl = document.getElementById('peer-label'); if(lbl) lbl.textContent = '';
+    ['pe','fpe','peg','ps','pb','eveb','eps','gm','om','pm','roe','roa','rev','rg','fcf','cash','debt','de'].forEach(id => {
+      setPeerVal('f-' + id + '-peer', '—');
+      setPeerVal('f-' + id + '-ind', '—');
+    });
+  }
+}
+
+function renderCompany(ticker, q, s, news) {
+  document.getElementById('co-result').style.display = 'block';
+
+  // Header
+  const name = q?.longName || q?.shortName || ticker;
+  document.getElementById('co-name').textContent = name;
+  const sd = s?.summaryDetail || {};
+  const fd = s?.financialData || {};
+  const ks = s?.defaultKeyStatistics || {};
+  const ap = s?.assetProfile || {};
+
+  const tags = [ap.sector, ap.industry, q?.exchange].filter(Boolean);
+  document.getElementById('co-tags').innerHTML = tags.map(t=>`<span class="co-tag">${t}</span>`).join('');
+
+  const price = q?.regularMarketPrice;
+  document.getElementById('co-price').textContent = price ? '$' + fmt(price) : '—';
+  const chgAmt = q?.regularMarketChange;
+  const chgPct = q?.regularMarketChangePercent;
+  const pchgEl = document.getElementById('co-pchg');
+  pchgEl.textContent = (chgAmt != null) ? `${chgAmt>=0?'+':''}$${fmt(Math.abs(chgAmt))} (${fmtPct(chgPct)})` : '—';
+  pchgEl.className = 'price-chg ' + dir(chgPct);
+  document.getElementById('co-mktcap').textContent = q?.marketCap ? 'Mkt Cap ' + fmtB(q.marketCap) : '';
+
+  // 52W range
+  const lo = q?.fiftyTwoWeekLow || sd.fiftyTwoWeekLow?.raw;
+  const hi = q?.fiftyTwoWeekHigh || sd.fiftyTwoWeekHigh?.raw;
+  if (lo && hi && price) {
+    const pct = Math.max(0, Math.min(100, ((price - lo) / (hi - lo)) * 100));
+    document.getElementById('w52-lo').textContent = '$' + fmt(lo);
+    document.getElementById('w52-hi').textContent = '$' + fmt(hi);
+    document.getElementById('range-fill').style.width = pct + '%';
+    document.getElementById('range-cursor').style.left = pct + '%';
+    document.getElementById('range-pct').textContent =
+      `Current price is ${fmt(pct, 0)}% through the 52-week range · Low: $${fmt(lo)} · High: $${fmt(hi)}`;
+  }
+
+  // Valuation
+  const setF = (id, val, cls='neutral') => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = val || '—';
+    el.className = 'fund-val ' + cls;
+  };
+  const peVal = sd.trailingPE?.raw; setF('f-pe', peVal ? fmt(peVal,1)+'x' : null, peVal > 40 ? 'warn' : peVal > 25 ? 'neutral' : 'good');
+  const fpeVal = sd.forwardPE?.raw; setF('f-fpe', fpeVal ? fmt(fpeVal,1)+'x' : null, fpeVal > 35 ? 'warn' : 'neutral');
+  const pegVal = ks.pegRatio?.raw; setF('f-peg', pegVal ? fmt(pegVal,2) : null, pegVal < 1 ? 'good' : pegVal < 2 ? 'neutral' : 'warn');
+  const psVal = sd.priceToSalesTrailing12Months?.raw; setF('f-ps', psVal ? fmt(psVal,2)+'x' : null);
+  const pbVal = sd.priceToBook?.raw; setF('f-pb', pbVal ? fmt(pbVal,2)+'x' : null);
+  const evebVal = ks.enterpriseToEbitda?.raw; setF('f-eveb', evebVal ? fmt(evebVal,1)+'x' : null);
+
+  // Profitability
+  const epsVal = ks.trailingEps?.raw; setF('f-eps', epsVal ? '$'+fmt(epsVal) : null, epsVal > 0 ? 'good' : 'bad');
+  const gmVal = fd.grossMargins?.raw; setF('f-gm', gmVal ? fmtPct(gmVal*100) : null, gmVal > 0.4 ? 'good' : gmVal > 0.2 ? 'neutral' : 'warn');
+  const omVal = fd.operatingMargins?.raw; setF('f-om', omVal ? fmtPct(omVal*100) : null, omVal > 0.15 ? 'good' : omVal > 0 ? 'neutral' : 'bad');
+  const pmVal = fd.profitMargins?.raw; setF('f-pm', pmVal ? fmtPct(pmVal*100) : null, pmVal > 0.1 ? 'good' : pmVal > 0 ? 'neutral' : 'bad');
+  const roeVal = fd.returnOnEquity?.raw; setF('f-roe', roeVal ? fmtPct(roeVal*100) : null, roeVal > 0.15 ? 'good' : roeVal > 0 ? 'neutral' : 'bad');
+  const roaVal = fd.returnOnAssets?.raw; setF('f-roa', roaVal ? fmtPct(roaVal*100) : null, roaVal > 0.08 ? 'good' : roaVal > 0 ? 'neutral' : 'bad');
+
+  // Balance sheet
+  const revVal = fd.totalRevenue?.raw; setF('f-rev', fmtB(revVal));
+  const rgVal = fd.revenueGrowth?.raw; setF('f-rg', rgVal ? fmtPct(rgVal*100) : null, rgVal > 0.1 ? 'good' : rgVal > 0 ? 'neutral' : 'bad');
+  const fcfVal = fd.freeCashflow?.raw; setF('f-fcf', fmtB(fcfVal), fcfVal > 0 ? 'good' : 'bad');
+  const cashVal = fd.totalCash?.raw; setF('f-cash', fmtB(cashVal));
+  const debtVal = fd.totalDebt?.raw; setF('f-debt', fmtB(debtVal));
+  const deVal = fd.debtToEquity?.raw; setF('f-de', deVal ? fmt(deVal/100,2)+'x' : null, deVal < 100 ? 'good' : deVal < 200 ? 'warn' : 'bad');
+
+  // Analyst consensus
+  const trend = s?.recommendationTrend?.trend?.[0];
+  if (trend) {
+    const buy = (trend.strongBuy||0) + (trend.buy||0);
+    const hold = trend.hold || 0;
+    const sell = (trend.sell||0) + (trend.strongSell||0);
+    const total = buy + hold + sell;
+    if (total > 0) {
+      document.getElementById('cb-buy').style.width = (buy/total*100) + '%';
+      document.getElementById('cb-hold').style.width = (hold/total*100) + '%';
+      document.getElementById('cb-sell').style.width = (sell/total*100) + '%';
+      document.getElementById('cl-buy').textContent = buy + ' BUY';
+      document.getElementById('cl-hold').textContent = hold + ' HOLD';
+      document.getElementById('cl-sell').textContent = sell + ' SELL';
+    }
+  }
+  const targetMean = fd.targetMeanPrice?.raw;
+  const targetLow = fd.targetLowPrice?.raw;
+  const targetHigh = fd.targetHighPrice?.raw;
+  if (targetMean && price) {
+    const upside = ((targetMean - price) / price) * 100;
+    const tEl = document.getElementById('target-price');
+    tEl.textContent = '$' + fmt(targetMean);
+    const udEl = document.getElementById('target-updown');
+    udEl.textContent = (upside >= 0 ? '+' : '') + fmt(upside, 1) + '% from current';
+    udEl.style.color = upside >= 0 ? 'var(--green)' : 'var(--red)';
+    if (targetLow && targetHigh) {
+      document.getElementById('target-range').textContent = `Range: $${fmt(targetLow)} – $${fmt(targetHigh)}`;
+    }
+  }
+
+  // News
+  const newsEl = document.getElementById('co-news');
+  if (news.length) {
+    newsEl.innerHTML = news.slice(0,8).map(n => `
+      <div class="co-news-item">
+        <div class="co-news-hl"><a href="${n.link||'#'}" target="_blank">${n.title}</a></div>
+        <div class="co-news-src">${n.publisher||''} · ${n.providerPublishTime ? timeAgo(n.providerPublishTime) : ''}</div>
+      </div>`).join('');
+  } else {
+    newsEl.innerHTML = '<div style="color:var(--text-faint);font-size:15px;padding:8px 0;">No news available.</div>';
+  }
+
+  // Kick off XBRL fetch (non-blocking — renders below news when ready)
+  document.getElementById('xbrl-section').style.display = 'block';
+  loadXBRL(ticker);
+}
+
+// ─── SEC EDGAR XBRL ──────────────────────────────────────────────────────────
+
+const EDGAR_UA = { headers: { 'User-Agent': 'Signal-Dashboard/1.0 contact@example.com' } };
+
+async function getEdgarCIK(ticker) {
+  const r = await fetch('https://www.sec.gov/files/company_tickers.json', EDGAR_UA);
+  const map = await r.json();
+  const entry = Object.values(map).find(e => e.ticker?.toUpperCase() === ticker.toUpperCase());
+  if (!entry) throw new Error('Ticker not found in SEC EDGAR: ' + ticker);
+  return entry.cik_str.toString().padStart(10, '0');
+}
+
+async function loadXBRL(ticker) {
+  const loadEl  = document.getElementById('xbrl-loading');
+  const errEl   = document.getElementById('xbrl-error');
+  const resEl   = document.getElementById('xbrl-result');
+  const setMsg  = m => { const e = document.getElementById('xbrl-loading-msg'); if(e) e.textContent = m; };
+
+  loadEl.style.display = 'block';
+  errEl.style.display  = 'none';
+  resEl.style.display  = 'none';
+
+  try {
+    setMsg('Resolving CIK from SEC EDGAR...');
+    const cik = await getEdgarCIK(ticker);
+
+    setMsg('Fetching XBRL company facts...');
+    const r = await fetch(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, EDGAR_UA);
+    if (!r.ok) throw new Error('XBRL data not found (status ' + r.status + ')');
+    const facts = await r.json();
+
+    setMsg('Extracting financials...');
+    const xbrl = parseXBRL(facts, cik, ticker);
+
+    loadEl.style.display = 'none';
+    renderXBRL(xbrl, cik);
+
+  } catch(e) {
+    loadEl.style.display = 'none';
+    errEl.style.display  = 'block';
+    document.getElementById('xbrl-error-msg').textContent =
+      '10-K data unavailable: ' + e.message +
+      ' · Some companies may not file XBRL or may use different taxonomy tags.';
+    console.warn('XBRL error:', e);
+  }
+}
+
+// ─── XBRL PARSER ─────────────────────────────────────────────────────────────
+// Maps standard US-GAAP XBRL concept tags → our metric slots.
+// Each entry is an ordered list of fallback tags — first match wins.
+
+const XBRL_MAP = {
+  rev:    ['Revenues','RevenueFromContractWithCustomerExcludingAssessedTax','SalesRevenueNet','RevenueFromContractWithCustomerIncludingAssessedTax'],
+  cogs:   ['CostOfRevenue','CostOfGoodsAndServicesSold','CostOfGoodsSold','CostOfSales'],
+  gp:     ['GrossProfit'],
+  rd:     ['ResearchAndDevelopmentExpense','ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost'],
+  sga:    ['SellingGeneralAndAdministrativeExpense','GeneralAndAdministrativeExpense'],
+  oi:     ['OperatingIncomeLoss','IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest'],
+  intexp: ['InterestExpense','InterestAndDebtExpense'],
+  ni:     ['NetIncomeLoss','NetIncome','ProfitLoss'],
+  eps:    ['EarningsPerShareDiluted','EarningsPerShareBasic'],
+  ocf:    ['NetCashProvidedByUsedInOperatingActivities','NetCashProvidedByUsedInOperatingActivitiesContinuingOperations'],
+  capex:  ['PaymentsToAcquirePropertyPlantAndEquipment','CapitalExpendituresIncurredButNotYetPaid','PaymentsForCapitalImprovements'],
+  da:     ['DepreciationDepletionAndAmortization','Depreciation','DepreciationAndAmortization'],
+  sbc:    ['ShareBasedCompensation','AllocatedShareBasedCompensationExpense'],
+  ta:     ['Assets'],
+  cash:   ['CashAndCashEquivalentsAtCarryingValue','CashCashEquivalentsAndShortTermInvestments','CashAndCashEquivalentsAndShortTermInvestments'],
+  debt:   ['LongTermDebtAndCapitalLeaseObligations','LongTermDebt','DebtCurrent','LongTermDebtCurrent'],
+  eq:     ['StockholdersEquity','StockholdersEquityAttributableToParent'],
+  shares: ['WeightedAverageNumberOfDilutedSharesOutstanding','CommonStockSharesOutstanding'],
+};
+
+function pickXBRL(usGaap, tags) {
+  for (const tag of tags) {
+    if (usGaap[tag]) return usGaap[tag];
+  }
+  return null;
+}
+
+function getAnnualValues(concept) {
+  // concept.units.USD or concept.units.shares etc
+  if (!concept) return [];
+  const units = concept.units;
+  const unitKey = Object.keys(units)[0];
+  if (!unitKey) return [];
+  const vals = units[unitKey];
+  // Filter to annual 10-K filings only (form=10-K, no quarters)
+  return vals
+    .filter(v => v.form === '10-K' && v.fp === 'FY' && v.val != null)
+    .sort((a, b) => b.end.localeCompare(a.end)); // most recent first
+}
+
+function getAnnualPure(concept) {
+  // Some concepts have both 10-K and 10-Q; prefer distinct FY end dates
+  const all = getAnnualValues(concept);
+  const seen = new Set();
+  return all.filter(v => {
+    if (seen.has(v.end)) return false;
+    seen.add(v.end);
+    return true;
+  });
+}
+
+function parseXBRL(facts, cik, ticker) {
+  const usg = facts.facts?.['us-gaap'] || {};
+
+  const get = (key) => getAnnualPure(pickXBRL(usg, XBRL_MAP[key]));
+
+  // Collect all series
+  const series = {};
+  for (const key of Object.keys(XBRL_MAP)) {
+    series[key] = get(key);
+  }
+
+  // Determine the two most recent fiscal years with revenue data
+  const revSeries = series.rev;
+  const fy0 = revSeries[0] || null;  // most recent FY
+  const fy1 = revSeries[1] || null;  // prior FY
+
+  const fy0Year = fy0 ? fy0.end.slice(0,4) : null;
+  const fy1Year = fy1 ? fy1.end.slice(0,4) : null;
+
+  // Helper: get value for a given end date from a series
+  const byDate = (s, endDate) => {
+    if (!endDate || !s?.length) return null;
+    const match = s.find(v => v.end === endDate);
+    return match ? match.val : null;
+  };
+
+  // For balance sheet items, grab the two most recent entries (may not align to FY dates exactly)
+  const bsGet = (key) => {
+    const s = series[key];
+    return { fy0: s[0]?.val ?? null, fy1: s[1]?.val ?? null, fy0date: s[0]?.end, fy1date: s[1]?.end };
+  };
+
+  // Income statement — match by FY end date
+  const is = (key) => ({
+    fy0: byDate(series[key], fy0?.end),
+    fy1: byDate(series[key], fy1?.end),
+  });
+
+  const rev   = is('rev');
+  const cogs  = is('cogs');
+  const gp    = { fy0: series.gp[0]?.val ?? (rev.fy0 != null && cogs.fy0 != null ? rev.fy0 - cogs.fy0 : null),
+                  fy1: series.gp[1]?.val ?? (rev.fy1 != null && cogs.fy1 != null ? rev.fy1 - cogs.fy1 : null) };
+  const rd    = is('rd');
+  const sga   = is('sga');
+  const oi    = is('oi');
+  const intexp = is('intexp');
+  const ni    = is('ni');
+  const eps   = is('eps');
+  const ocf   = is('ocf');
+  const capex = is('capex');
+  const da    = is('da');
+  const sbc   = is('sbc');
+
+  // FCF = OCF - CapEx (CapEx is usually negative in XBRL so add it)
+  const fcf = {
+    fy0: (ocf.fy0 != null && capex.fy0 != null) ? ocf.fy0 - Math.abs(capex.fy0) : null,
+    fy1: (ocf.fy1 != null && capex.fy1 != null) ? ocf.fy1 - Math.abs(capex.fy1) : null,
+  };
+
+  // Balance sheet
+  const ta   = bsGet('ta');
+  const cash = bsGet('cash');
+  const debt = bsGet('debt');
+  const eq   = bsGet('eq');
+  const sh   = is('shares'); // shares outstanding
+
+  // Entity info
+  const entityName = facts.entityName || ticker;
+  const filingDate = fy0?.filed || '';
+
+  return {
+    ticker, entityName, cik, filingDate,
+    fy0Year, fy1Year,
+    fy0end: fy0?.end, fy1end: fy1?.end,
+    rev, cogs, gp, rd, sga, oi, intexp, ni, eps, ocf, capex, fcf, da, sbc,
+    ta, cash, debt, eq, sh,
+  };
+}
+
+// ─── XBRL RENDERER ───────────────────────────────────────────────────────────
+
+function renderXBRL(d, cik) {
+  const resEl = document.getElementById('xbrl-result');
+  resEl.style.display = 'block';
+
+  // Filing info
+  document.getElementById('xbrl-filing-info').textContent =
+    `${d.entityName} · FY${d.fy1Year} vs FY${d.fy0Year} · Filed: ${d.filingDate || 'N/A'} · Source: SEC EDGAR XBRL`;
+  const link = document.getElementById('xbrl-edgar-link');
+  link.href = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${d.cik}&type=10-K&dateb=&owner=include&count=10`;
+
+  // Column headers — inject into each block title
+  const fyLbl = `FY${d.fy1Year} · FY${d.fy0Year} · YoY`;
+  document.querySelectorAll('.xbrl-fy-labels').forEach(el => el.textContent = fyLbl);
+
+  // Add column header row inside each block before first row
+  document.querySelectorAll('.xbrl-block').forEach(block => {
+    const existing = block.querySelector('.xbrl-col-hdr');
+    if (!existing) {
+      const hdr = document.createElement('div');
+      hdr.className = 'xbrl-col-hdr';
+      hdr.innerHTML = `<span>METRIC</span><span>FY${d.fy1Year}</span><span>FY${d.fy0Year}</span><span>YoY</span>`;
+      block.insertBefore(hdr, block.querySelector('.xbrl-row'));
+    }
+  });
+
+  // Helper functions
+  const setRow = (prefix, fy1val, fy0val, opts = {}) => {
+    const { isDollar=true, isEps=false, isShares=false, isRatio=false } = opts;
+    const fmt1 = isEps ? fmtEps : isShares ? fmtSh : isRatio ? fmtRatio : fmtB;
+
+    const v1El = document.getElementById(`x-${prefix}-fy1`);
+    const v0El = document.getElementById(`x-${prefix}-fy0`);
+    const yEl  = document.getElementById(`x-${prefix}-yoy`);
+
+    if (v1El) v1El.textContent = fy1val != null ? fmt1(fy1val) : '—';
+    if (v0El) v0El.textContent = fy0val != null ? fmt1(fy0val) : '—';
+
+    if (yEl && fy1val != null && fy0val != null && fy0val !== 0) {
+      const pct = ((fy0val - fy1val) / Math.abs(fy1val)) * 100;
+      yEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+      yEl.className = 'xbrl-yoy ' + (pct > 0 ? 'pos' : pct < 0 ? 'neg' : 'flat');
+    } else if (yEl) { yEl.textContent = '—'; yEl.className = 'xbrl-yoy flat'; }
+  };
+
+  const setMargin = (prefix, numFy1, numFy0, denFy1, denFy0) => {
+    const calc = (n, d) => (n != null && d != null && d !== 0) ? (n / d * 100) : null;
+    const m1 = calc(numFy1, denFy1);
+    const m0 = calc(numFy0, denFy0);
+    const v1El = document.getElementById(`x-${prefix}-fy1`);
+    const v0El = document.getElementById(`x-${prefix}-fy0`);
+    const dEl  = document.getElementById(`x-${prefix}-delta`);
+    if (v1El) v1El.textContent = m1 != null ? m1.toFixed(1) + '%' : '—';
+    if (v0El) v0El.textContent = m0 != null ? m0.toFixed(1) + '%' : '—';
+    if (dEl && m1 != null && m0 != null) {
+      const delta = m0 - m1;
+      dEl.textContent = (delta >= 0 ? '+' : '') + delta.toFixed(1) + 'pp';
+      dEl.className = 'xbrl-delta ' + (delta > 0 ? 'pos' : delta < 0 ? 'neg' : '');
+    } else if (dEl) { dEl.textContent = '—'; dEl.className = 'xbrl-delta'; }
+  };
+
+  const setBsRow = (prefix, obj, opts={}) => {
+    setRow(prefix, obj.fy1, obj.fy0, opts);
+  };
+
+  // ── INCOME STATEMENT ──
+  setRow('rev',   d.rev.fy1,   d.rev.fy0);
+  setRow('cogs',  d.cogs.fy1,  d.cogs.fy0);
+  setRow('gp',    d.gp.fy1,    d.gp.fy0);
+  setMargin('gm', d.gp.fy1, d.gp.fy0, d.rev.fy1, d.rev.fy0);
+  setRow('rd',    d.rd.fy1,    d.rd.fy0);
+  setRow('sga',   d.sga.fy1,   d.sga.fy0);
+  setRow('oi',    d.oi.fy1,    d.oi.fy0);
+  setMargin('om', d.oi.fy1, d.oi.fy0, d.rev.fy1, d.rev.fy0);
+  setRow('int',   d.intexp.fy1, d.intexp.fy0);
+  setRow('ni',    d.ni.fy1,    d.ni.fy0);
+  setMargin('nm', d.ni.fy1, d.ni.fy0, d.rev.fy1, d.rev.fy0);
+  setRow('eps',   d.eps.fy1,   d.eps.fy0,   { isEps: true });
+
+  // ── CASH FLOW ──
+  setRow('ocf',   d.ocf.fy1,   d.ocf.fy0);
+  const capex1 = d.capex.fy1 != null ? -Math.abs(d.capex.fy1) : null; // display as negative
+  const capex0 = d.capex.fy0 != null ? -Math.abs(d.capex.fy0) : null;
+  setRow('capex', capex1, capex0);
+  setRow('fcf',   d.fcf.fy1,   d.fcf.fy0);
+  setMargin('fcfm', d.fcf.fy1, d.fcf.fy0, d.rev.fy1, d.rev.fy0);
+  setRow('da',    d.da.fy1,    d.da.fy0);
+  setRow('sbc',   d.sbc.fy1,   d.sbc.fy0);
+
+  // ── BALANCE SHEET ──
+  setBsRow('ta',   d.ta);
+  setBsRow('cash', d.cash);
+  setBsRow('debt', d.debt);
+
+  // Net cash = cash - debt
+  const nc = { fy0: (d.cash.fy0 != null && d.debt.fy0 != null) ? d.cash.fy0 - d.debt.fy0 : null,
+               fy1: (d.cash.fy1 != null && d.debt.fy1 != null) ? d.cash.fy1 - d.debt.fy1 : null };
+  setRow('netcash', nc.fy1, nc.fy0);
+
+  setBsRow('eq', d.eq);
+
+  // D/E ratio
+  const de = (prefix, eqObj, debtObj) => {
+    const calc = (debt, eq) => (debt != null && eq != null && eq !== 0) ? (debt/eq).toFixed(2)+'x' : '—';
+    const v1El = document.getElementById(`x-${prefix}-fy1`);
+    const v0El = document.getElementById(`x-${prefix}-fy0`);
+    const dEl  = document.getElementById(`x-${prefix}-delta`);
+    if (v1El) v1El.textContent = calc(debtObj.fy1, eqObj.fy1);
+    if (v0El) v0El.textContent = calc(debtObj.fy0, eqObj.fy0);
+    if (dEl) dEl.textContent = '—';
+  };
+  de('de', d.eq, d.debt);
+
+  setBsRow('sh', { fy0: d.sh.fy0, fy1: d.sh.fy1 }, { isShares: true });
+}
+
+// ─── FORMAT HELPERS ───────────────────────────────────────────────────────────
+function fmtEps(n)   { if (n == null || isNaN(n)) return '—'; return (n >= 0 ? '$' : '-$') + Math.abs(n).toFixed(2); }
+function fmtSh(n)    { if (n == null || isNaN(n)) return '—'; return (n/1e6).toFixed(1) + 'M'; }
+function fmtRatio(n) { if (n == null || isNaN(n)) return '—'; return n.toFixed(2) + 'x'; }
+
+// ─── PLACEHOLDER DATA ─────────────────────────────────────────────────────────
+// Pre-fills all sections on load so the app is immediately browsable.
+// Every section is overwritten when live API data returns successfully.
+
+function drawPlaceholderCharts(range = '5Y', groups = ['macro', 'rec']) {
+  const RANGE_N = { '1Y': 12, '3Y': 36 };
+  const nPts = RANGE_N[range] || 60;
+  const dataYears = RANGE_N[range] ? parseFloat(range) : 5;
+  const nowMs = Date.now();
+  const spanMs = dataYears * 365.25 * 24 * 3600 * 1000;
+  const startMs = nowMs - spanMs;
+
+  // Convert flat value array to {date, val} series with generated monthly dates
+  const makeSeries = pts => {
+    const sl = pts.slice(-nPts);
+    return sl.map((val, i) => {
+      const d = new Date(startMs + (i / Math.max(sl.length - 1, 1)) * spanMs);
+      return { date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`, val };
+    });
+  };
+
+  const MACRO_CFGS = [
+    { id:'chart-ffr',    color:'#4A88CC', unit:'%', yDec:2, pts:[2.4,2.4,0.08,0.08,0.09,0.33,0.83,1.58,2.33,3.08,3.83,4.33,4.58,4.83,5.08,5.25,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33] },
+    { id:'chart-cpi',    color:'#C49030', unit:'%', yDec:1, pts:[1.8,2.3,2.1,2.4,1.5,0.6,1.2,1.4,1.7,2.0,2.6,3.0,3.8,4.7,5.4,6.2,7.0,7.7,8.3,9.1,8.5,8.2,7.7,7.1,6.5,6.0,5.5,5.0,4.9,4.7,4.4,4.0,3.7,3.4,3.2,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1,3.1] },
+    { id:'chart-unemp',  color:'#8B6FD4', unit:'%', yDec:1, pts:[3.7,3.5,3.5,3.5,4.4,13.3,14.7,10.2,8.4,6.9,6.7,6.0,5.8,5.4,5.0,4.6,4.2,3.9,3.6,3.6,3.7,3.7,3.5,3.5,3.4,3.4,3.4,3.5,3.5,3.6,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7,3.7] },
+    { id:'chart-yc',     color:'#C45252', unit:'%', yDec:2, zeroLine:true, pts:[0.16,0.34,0.26,0.05,-0.02,0.52,1.21,1.48,1.52,1.36,1.19,1.04,0.88,0.72,0.54,0.42,0.24,0.08,-0.12,-0.42,-0.68,-0.82,-0.94,-1.07,-0.95,-0.78,-0.62,-0.48,-0.39,-0.34,-0.28,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24] },
+    { id:'chart-income', color:'#3DAB6E', unit:'%', yDec:1, zeroLine:true, pts:[2.8,2.6,2.4,2.2,2.0,-1.2,-6.2,-3.8,1.4,2.4,3.1,3.4,4.2,4.6,4.8,4.2,3.6,3.0,2.6,2.4,2.2,2.0,1.8,1.8,2.0,2.2,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4] },
+  ];
+  const REC_CFGS = [
+    { id:'rc-chart-yield',  color:'#C45252', unit:'%', yDec:2, zeroLine:true,      pts:[0.16,0.34,0.26,0.05,-0.02,0.52,1.21,1.48,1.52,1.36,1.19,1.04,0.88,0.72,0.54,0.42,0.24,0.08,-0.12,-0.42,-0.68,-0.82,-0.94,-1.07,-0.95,-0.78,-0.62,-0.48,-0.39,-0.34,-0.28,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24,-0.24] },
+    { id:'rc-chart-sahm',   color:'#8B6FD4', unit:'',  yDec:2, thresholdLine:0.5, pts:[0.0,0.0,0.0,0.07,0.13,0.53,0.80,0.60,0.33,0.20,0.13,0.07,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.07,0.13,0.17,0.17,0.20,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17] },
+    { id:'rc-chart-ism',    color:'#C49030', unit:'%', yDec:1, zeroLine:true,      pts:[2.1,2.8,3.4,3.2,3.6,1.2,-8.2,-12.4,-6.8,2.4,5.2,7.8,6.4,5.1,4.2,4.0,3.8,3.2,2.8,2.4,2.0,1.8,1.6,1.4,1.8,2.2,2.4,1.8,1.2,0.8,0.4,-0.2,-0.6,-0.8,-0.4,0.2,0.6,0.8,1.0,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2] },
+    { id:'rc-chart-income', color:'#3DAB6E', unit:'%', yDec:1, zeroLine:true,      pts:[2.8,2.6,2.4,2.2,2.0,-1.2,-6.2,-3.8,1.4,2.4,3.1,3.4,4.2,4.6,4.8,4.2,3.6,3.0,2.6,2.4,2.2,2.0,1.8,1.8,2.0,2.2,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4,2.4] },
+  ];
+
+  if (groups.includes('macro'))
+    MACRO_CFGS.forEach(c => drawLineChart(c.id, makeSeries(c.pts), { color:c.color, zeroLine:c.zeroLine, thresholdLine:c.thresholdLine, unit:c.unit, yDec:c.yDec }));
+  if (groups.includes('rec'))
+    REC_CFGS.forEach(c => drawLineChart(c.id, makeSeries(c.pts), { color:c.color, zeroLine:c.zeroLine, thresholdLine:c.thresholdLine, unit:c.unit, yDec:c.yDec, chartH:90, compact:true }));
+}
+
+function renderPlaceholders() {
+  const s = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
+
+  // ── MARKET INDICATORS ──
+  [['sp500','5,891','+0.82%','up'],['ndx','21,204','+1.14%','up'],['dji','39,121','+0.55%','up'],
+   ['vix','14.8','-9.1%','dn'],['10y','4.52%','-0.02%','dn'],['dxy','104.2','+0.22%','up'],
+   ['oil','$81.4','-0.90%','dn'],['gold','$2,341','+0.45%','up']].forEach(([id,val,chg,d]) => {
+    const v=document.getElementById('v-'+id), g=document.getElementById('g-'+id), c=document.getElementById('c-'+id);
+    if (v) v.textContent = val;
+    if (g) { g.textContent = chg; g.className = 'ind-chg ' + d; }
+    if (c) c.className = 'ind-card ' + d;
+  });
+
+  // ── MACRO CHARTS ──
+  drawPlaceholderCharts('5Y');
+  s('cv-ffr','5.33%'); s('cv-unemp','3.7%');
+  const cvCpi = document.getElementById('cv-cpi'); if (cvCpi) cvCpi.textContent = '3.1%';
+  const cvYc = document.getElementById('cv-yc'); if (cvYc) { cvYc.textContent = '−0.24%'; cvYc.style.color = 'var(--amber)'; }
+  const cvInc = document.getElementById('cv-income'); if (cvInc) { cvInc.textContent = '+2.4%'; cvInc.style.color = 'var(--green)'; }
+  s('chart-status','Sample data · add FRED key for live charts');
+
+  // ── FRED TEXT CARDS ──
+  s('fred-ffr','5.33%'); s('fred-ffr-m','As of Jan 2024');
+  s('fred-cpi','3.1'); s('fred-cpi-m','Index · Jan 2024');
+  s('fred-unemp','3.7%'); s('fred-unemp-m','As of Jan 2024');
+  s('fred-gdp','3.4%'); s('fred-gdp-m','As of Q4 2023');
+  s('fred-status','Sample data · add FRED key for live');
+
+  // ── RECESSION SCORECARDS ──
+  setRecCard('yield','−0.24%','⚠ INVERTED','warn','10Y: 4.52% · 2Y: 4.76%');
+  setRecCard('sahm','0.17pp','✓ CLEAR — below threshold','clear','As of Jan 2024 · FRED: SAHMREALTIME');
+  setRecCard('ism','+1.2%','✓ EXPANSION — positive output growth','clear','YoY · Sample data · FRED: IPMAN');
+  setRecCard('income','+2.4%','✓ HEALTHY — in normal range','clear','YoY · Latest: Jan 2024 · FRED: W875RX1');
+  const rsl = document.getElementById('rec-status-line');
+  if (rsl) { rsl.textContent = '△ 2 of 4 indicators showing caution'; rsl.style.color = 'var(--amber)'; }
+
+  // ── SECTORS ──
+  [['xlk','+1.4%','up'],['xlf','-0.3%','down'],['xlv','+0.2%','up'],['xle','-0.8%','down'],
+   ['xly','+0.6%','up'],['xlp','+0.1%','up'],['xli','+0.5%','up'],['xlu','-0.4%','down'],
+   ['xlre','-0.6%','down'],['xlb','0.0%','flat'],['xlc','+0.9%','up']].forEach(([id,val,d]) => {
+    const e = document.getElementById('sc-' + id);
+    if (e) { e.textContent = val; e.className = 'sector-pct ' + d; }
+  });
+
+  // ── MACRO NEWS ──
+  const now = Date.now() / 1000;
+  const renderNews = (id, items) => {
+    const e = document.getElementById(id); if (!e) return;
+    e.innerHTML = items.map(({t,p,ts}) =>
+      `<div class="news-item"><div class="news-hl"><a href="#" onclick="return false">${t}</a></div><div class="news-meta">${p} · ${timeAgo(ts)}</div></div>`
+    ).join('');
+  };
+  renderNews('macro-news-1', [
+    {t:'Fed signals patience on rate cuts as inflation stalls at 3.1%', p:'Bloomberg', ts:now-720},
+    {t:'Nvidia surges after analyst upgrades on AI infrastructure spending', p:'WSJ', ts:now-2040},
+    {t:'China manufacturing PMI contracts for third consecutive month', p:'Reuters', ts:now-3600},
+    {t:'S&P 500 on track for fifth consecutive week of gains', p:'CNBC', ts:now-10800},
+    {t:'Treasury yields rise as strong jobs data complicates rate-cut timeline', p:'FT', ts:now-18000},
+  ]);
+  renderNews('macro-news-2', [
+    {t:'Fed Funds futures price in two cuts for 2024 after inflation data', p:'Bloomberg', ts:now-1800},
+    {t:'CPI cooling but shelter costs keep inflation above Fed 2% target', p:'WSJ', ts:now-5400},
+    {t:'Real wages turn positive for first time in two years', p:'FT', ts:now-7200},
+    {t:'Commercial real estate distress deepens as office vacancy hits record', p:'Reuters', ts:now-14400},
+    {t:'Bank stress tests show resilience despite high-rate environment', p:'CNBC', ts:now-21600},
+  ]);
+
+  // ── COMPANY: pre-load AAPL ──
+  const ti = document.getElementById('ticker-input'); if (ti) ti.value = 'AAPL';
+  s('co-name','Apple Inc.');
+  const ctags = document.getElementById('co-tags');
+  if (ctags) ctags.innerHTML = '<span class="co-tag">Technology</span><span class="co-tag">Consumer Electronics</span><span class="co-tag">NASDAQ</span>';
+  s('co-price','$189.42');
+  const pchg = document.getElementById('co-pchg');
+  if (pchg) { pchg.textContent = '+$2.31 (+1.23%)'; pchg.className = 'price-chg up'; }
+  s('co-mktcap','Mkt Cap $2.94T');
+  s('w52-lo','$164.08'); s('w52-hi','$198.23');
+  const rfill = document.getElementById('range-fill'); if (rfill) rfill.style.width = '72%';
+  const rcur = document.getElementById('range-cursor'); if (rcur) rcur.style.left = '72%';
+  s('range-pct','Current price 72% through 52-week range  ·  Low: $164.08  ·  High: $198.23');
+
+  // Fundamentals
+  const setF = (id, val, cls='neutral') => {
+    const e = document.getElementById(id); if (!e) return;
+    e.textContent = val; e.className = 'fund-val ' + cls;
+  };
+  setF('f-pe','29.1x','warn'); setF('f-fpe','26.8x','warn'); setF('f-peg','2.84','neutral');
+  setF('f-ps','7.6x','warn'); setF('f-pb','48.2x','bad'); setF('f-eveb','22.4x','warn');
+  setF('f-eps','$6.51','good'); setF('f-gm','+46.2%','good'); setF('f-om','+31.5%','good');
+  setF('f-pm','+26.3%','good'); setF('f-roe','+147%','good'); setF('f-roa','+22.6%','good');
+  setF('f-rev','$385.7B','neutral'); setF('f-rg','+2.0%','warn');
+  setF('f-fcf','$99.6B','good'); setF('f-cash','$61.6B','neutral');
+  setF('f-debt','$108.0B','warn'); setF('f-de','1.51x','warn');
+
+  // Column headers
+  ['fh-co1','fh-co2','fh-co3'].forEach(id => s(id,'AAPL'));
+  ['fh-peer1','fh-peer2','fh-peer3'].forEach(id => s(id,'MSFT'));
+  s('peer-label','· vs MSFT');
+
+  // Industry avg (no free source)
+  ['pe','fpe','peg','ps','pb','eveb','eps','gm','om','pm','roe','roa','rev','rg','fcf','cash','debt','de']
+    .forEach(id => s('f-' + id + '-ind','—'));
+
+  // Peer (MSFT)
+  const setP = (id, val) => s('f-' + id + '-peer', val);
+  setP('pe','34.8x'); setP('fpe','31.2x'); setP('peg','2.46'); setP('ps','11.4x'); setP('pb','13.4x'); setP('eveb','24.8x');
+  setP('eps','$11.04'); setP('gm','+69.8%'); setP('om','+44.6%'); setP('pm','+35.1%'); setP('roe','+38.6%'); setP('roa','+18.2%');
+  setP('rev','$227.6B'); setP('rg','+15.7%'); setP('fcf','$67.0B'); setP('cash','$80.6B'); setP('debt','$79.4B'); setP('de','0.72x');
+
+  // Analyst consensus
+  ['cb-buy','cb-hold','cb-sell'].forEach((id,i) => {
+    const e = document.getElementById(id); if (e) e.style.width = ['58%','34%','8%'][i];
+  });
+  s('cl-buy','29 BUY'); s('cl-hold','17 HOLD'); s('cl-sell','4 SELL');
+  s('target-price','$205.00');
+  const ud = document.getElementById('target-updown');
+  if (ud) { ud.textContent = '+8.2% from current'; ud.style.color = 'var(--green)'; }
+  s('target-range','Range: $160 – $230');
+
+  // XBRL (AAPL FY2023 vs FY2024)
+  const xbrlSection = document.getElementById('xbrl-section');
+  if (xbrlSection) xbrlSection.style.display = 'block';
+  const xbrlResult = document.getElementById('xbrl-result');
+  if (xbrlResult) xbrlResult.style.display = 'block';
+  const xbrlLoading = document.getElementById('xbrl-loading');
+  if (xbrlLoading) xbrlLoading.style.display = 'none';
+  s('xbrl-filing-info','Apple Inc. · FY2023 vs FY2024 · Filed: 2024-11-01 · Source: SEC EDGAR XBRL');
+  const link = document.getElementById('xbrl-edgar-link');
+  if (link) { link.href = 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000320193&type=10-K'; link.textContent = 'View on EDGAR →'; }
+  document.querySelectorAll('.xbrl-fy-labels').forEach(e => e.textContent = 'FY2023 · FY2024 · YoY');
+  document.querySelectorAll('.xbrl-block').forEach(block => {
+    if (!block.querySelector('.xbrl-col-hdr')) {
+      const hdr = document.createElement('div');
+      hdr.className = 'xbrl-col-hdr';
+      hdr.innerHTML = '<span>METRIC</span><span></span><span>FY2023</span><span>FY2024</span><span>YoY</span>';
+      const firstRow = block.querySelector('.xbrl-row');
+      if (firstRow) block.insertBefore(hdr, firstRow);
+    }
+  });
+
+  const xv = (prefix, v1, v0, yoy) => {
+    s('x-'+prefix+'-fy1', v0);   // fy1 = older year (left col)
+    s('x-'+prefix+'-fy0', v1);   // fy0 = newer year
+    const yEl = document.getElementById('x-'+prefix+'-yoy') || document.getElementById('x-'+prefix+'-delta');
+    if (yEl) {
+      yEl.textContent = yoy;
+      const base = yEl.id.endsWith('delta') ? 'xbrl-delta' : 'xbrl-yoy';
+      yEl.className = base + ' ' + (yoy.startsWith('+') ? 'pos' : (yoy.startsWith('-') || yoy.startsWith('−') ? 'neg' : ''));
+    }
+  };
+  // Income statement
+  xv('rev','$391.0B','$383.3B','+2.0%'); xv('cogs','$210.4B','$214.1B','-1.7%'); xv('gp','$180.7B','$169.1B','+6.8%');
+  xv('gm','46.2%','44.1%','+2.1pp'); xv('rd','$31.4B','$29.9B','+5.1%'); xv('sga','$26.1B','$24.9B','+4.8%');
+  xv('oi','$123.2B','$114.3B','+7.8%'); xv('om','31.5%','29.8%','+1.7pp'); xv('int','$3.8B','$3.9B','−2.6%');
+  xv('ni','$102.8B','$97.0B','+6.0%'); xv('nm','26.3%','25.3%','+1.0pp'); xv('eps','$6.51','$6.13','+6.2%');
+  // Cash flow
+  xv('ocf','$118.3B','$113.6B','+4.1%'); xv('capex','−$11.4B','−$10.9B','+4.6%');
+  xv('fcf','$106.9B','$102.7B','+4.1%'); xv('fcfm','27.3%','26.8%','+0.5pp');
+  xv('da','$12.1B','$11.5B','+5.2%'); xv('sbc','$11.7B','$10.8B','+8.3%');
+  // Balance sheet
+  xv('ta','$364.9B','$352.6B','+3.5%'); xv('cash','$61.6B','$57.7B','+6.8%');
+  xv('debt','$108.0B','$111.1B','−2.8%'); xv('netcash','−$46.4B','−$53.4B','improving');
+  xv('eq','$56.9B','$62.1B','−8.4%'); xv('de','1.90x','1.79x','+0.11x'); xv('sh','15,408M','15,813M','−2.6%');
+
+  // Company news
+  const coNews = document.getElementById('co-news');
+  if (coNews) {
+    coNews.innerHTML = [
+      {t:'Apple Intelligence features drive upgrade cycle expectations for iPhone 17', p:'Bloomberg', ts:now-7200},
+      {t:'Services revenue hits all-time high as App Store and TV+ subscriptions accelerate', p:'WSJ', ts:now-18000},
+      {t:'Apple reportedly in talks with Google to license Gemini AI for on-device features', p:'FT', ts:now-28800},
+      {t:'India manufacturing ramp continues as Apple diversifies supply chain from China', p:'Reuters', ts:now-86400},
+    ].map(({t,p,ts}) =>
+      `<div class="news-item"><div class="news-hl"><a href="#" onclick="return false">${t}</a></div><div class="news-meta">${p} · ${timeAgo(ts)}</div></div>`
+    ).join('');
+  }
+
+  // Show company result
+  document.getElementById('co-empty').style.display = 'none';
+  document.getElementById('co-result').style.display = 'block';
+  document.getElementById('co-loading').style.display = 'none';
+}
+
+// ─── SETUP ───────────────────────────────────────────────────────────────────
+function saveSetup() {
+  const fredKey = document.getElementById('key-fred').value.trim();
+  if (fredKey) localStorage.setItem('signal_fred', fredKey);
+  const st = document.getElementById('setup-status');
+  st.style.display = 'block';
+  setTimeout(() => { st.style.display = 'none'; }, 2000);
+  fredHistoryCache = {};  // invalidate cache so charts re-fetch with new key
+  loadFredIndicators();
+  drawMacroCharts(activeCRange);
+}
+
+function initSetup() {
+  const f = getKey('fred'); if (f) document.getElementById('key-fred').value = f;
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+setTS();
+setInterval(setTS, 60000);
+initSetup();
+renderPlaceholders();   // fill all sections with sample data immediately
+loadAllMacro();
+drawMacroCharts('5Y');
+</script>
+</body>
+</html>
