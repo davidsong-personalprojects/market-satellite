@@ -419,6 +419,7 @@ def main() -> None:
         t1 = AudioCaptureThread(device_index, audio_q, stop_event)
         t2 = TranscriptionThread(model, audio_q, translation_q, stop_event, status_callback)
         t3 = TranslationThread(translation_q, get_target_iso, status_callback, display_callback, stop_event)
+        active_threads.clear()
         active_threads.extend([t1, t2, t3])
         for t in active_threads:
             t.start()
