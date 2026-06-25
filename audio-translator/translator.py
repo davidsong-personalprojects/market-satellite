@@ -224,3 +224,63 @@ class TranslationThread(threading.Thread):
 
             self.display_callback(translated)
             self.status_callback("Listening")
+
+
+# ── Subtitle Overlay Window ───────────────────────────────────────────────────
+class SubtitleWindow:
+    """Full-screen borderless transparent overlay; renders subtitles at the bottom."""
+
+    def __init__(self, root: tk.Tk):
+        self.win = tk.Toplevel(root)
+        self.win.overrideredirect(True)
+        self.win.attributes("-topmost", True)
+        self.win.attributes("-transparent", True)
+        self.win.configure(bg="systemTransparent")
+
+        sw = self.win.winfo_screenwidth()
+        sh = self.win.winfo_screenheight()
+        self.win.geometry(f"{sw}x{sh}+0+0")
+        self._sw = sw
+        self._sh = sh
+
+        self.canvas = tk.Canvas(
+            self.win,
+            width=sw,
+            height=sh,
+            bg="systemTransparent",
+            highlightthickness=0,
+        )
+        self.canvas.pack()
+
+    def update_subtitle(self, text: str, font_size: int) -> None:
+        """Replace current subtitle. Call only from the main thread (use root.after)."""
+        self.canvas.delete("all")
+        if not text:
+            return
+
+        font_tuple = ("Menlo", font_size, "bold")
+        center_x = self._sw // 2
+        text_y = self._sh - SUBTITLE_BOTTOM_OFFSET
+
+        # Render off-screen to measure bounding box, then redraw in z-order
+        probe = self.canvas.create_text(
+            center_x, text_y,
+            text=text, font=font_tuple, fill="white",
+            width=self._sw - 100, anchor="center",
+        )
+        bbox = self.canvas.bbox(probe)
+        self.canvas.delete(probe)
+
+        p = SUBTITLE_PADDING
+        # Dark semi-transparent backing rectangle (stipple="gray75" ≈ 75% opacity on macOS)
+        self.canvas.create_rectangle(
+            bbox[0] - p, bbox[1] - p, bbox[2] + p, bbox[3] + p,
+            fill="#111111", outline="", stipple="gray75",
+        )
+
+        # White text on top
+        self.canvas.create_text(
+            center_x, text_y,
+            text=text, font=font_tuple, fill="white",
+            width=self._sw - 100, anchor="center",
+        )
