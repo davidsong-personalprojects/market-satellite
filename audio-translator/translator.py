@@ -374,3 +374,70 @@ class ControlPanel:
             self._on_start(device_idx)
             self._btn.configure(text="Stop")
         self._running = not self._running
+
+
+# ── Main Entry Point ──────────────────────────────────────────────────────────
+def main() -> None:
+    print(f"Loading Whisper '{DEFAULT_WHISPER_MODEL}' model…")
+    model = whisper.load_model(DEFAULT_WHISPER_MODEL)
+    print("Model ready.")
+
+    audio_q: queue.Queue = queue.Queue(maxsize=10)
+    translation_q: queue.Queue = queue.Queue(maxsize=10)
+    stop_event = threading.Event()
+    active_threads: list = []
+
+    root = tk.Tk()
+    root.withdraw()
+
+    subtitle_win = SubtitleWindow(root)
+
+    target_lang_var = tk.StringVar(value="English")
+    status_var = tk.StringVar(value="Stopped")
+    font_size_var = tk.IntVar(value=DEFAULT_FONT_SIZE)
+
+    def status_callback(status: str) -> None:
+        root.after(0, status_var.set, status)
+
+    def display_callback(text: str) -> None:
+        root.after(0, subtitle_win.update_subtitle, text, font_size_var.get())
+
+    def get_target_iso() -> str:
+        return LANGUAGE_OPTIONS.get(target_lang_var.get(), "en")
+
+    def _drain_queue(q: queue.Queue) -> None:
+        while not q.empty():
+            try:
+                q.get_nowait()
+            except queue.Empty:
+                break
+
+    def start_pipeline(device_index: Optional[int]) -> None:
+        _drain_queue(audio_q)
+        _drain_queue(translation_q)
+        stop_event.clear()
+        t1 = AudioCaptureThread(device_index, audio_q, stop_event)
+        t2 = TranscriptionThread(model, audio_q, translation_q, stop_event, status_callback)
+        t3 = TranslationThread(translation_q, get_target_iso, status_callback, display_callback, stop_event)
+        active_threads.extend([t1, t2, t3])
+        for t in active_threads:
+            t.start()
+        status_callback("Listening")
+
+    def stop_pipeline() -> None:
+        stop_event.set()
+        for t in active_threads:
+            t.join(timeout=3.0)
+        active_threads.clear()
+        status_callback("Stopped")
+        root.after(0, subtitle_win.update_subtitle, "", DEFAULT_FONT_SIZE)
+
+    devices = _get_audio_devices()
+    ControlPanel(root, devices, start_pipeline, stop_pipeline, target_lang_var, status_var, font_size_var)
+
+    root.deiconify()
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
