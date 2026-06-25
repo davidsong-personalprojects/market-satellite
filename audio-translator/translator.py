@@ -183,3 +183,44 @@ class TranscriptionThread(threading.Thread):
                 self.translation_queue.put((sentence, detected_lang))
 
             self.status_callback("Listening")
+
+
+# ── Thread 3: Translation + Display ───────────────────────────────────────────
+class TranslationThread(threading.Thread):
+    """Translates completed sentences; hands result to display_callback via root.after."""
+
+    def __init__(
+        self,
+        translation_queue: queue.Queue,
+        get_target_iso,      # callable() -> str  (reads current UI selection)
+        status_callback,     # callable(str) -> None
+        display_callback,    # callable(str) -> None
+        stop_event: threading.Event,
+    ):
+        super().__init__(daemon=True)
+        self.translation_queue = translation_queue
+        self.get_target_iso = get_target_iso
+        self.status_callback = status_callback
+        self.display_callback = display_callback
+        self.stop_event = stop_event
+
+    def run(self) -> None:
+        while not self.stop_event.is_set():
+            try:
+                sentence, detected_lang = self.translation_queue.get(timeout=1.0)
+            except queue.Empty:
+                continue
+
+            target_iso = self.get_target_iso()
+
+            if should_translate(detected_lang, target_iso):
+                self.status_callback("Translating")
+                try:
+                    translated = GoogleTranslator(source="auto", target=target_iso).translate(sentence)
+                except Exception:
+                    translated = sentence   # graceful degradation: show raw transcript
+            else:
+                translated = sentence       # detected lang matches target — skip API call
+
+            self.display_callback(translated)
+            self.status_callback("Listening")
