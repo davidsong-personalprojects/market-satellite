@@ -99,11 +99,12 @@ def should_translate(whisper_lang: str, target_iso: str) -> bool:
 class AudioCaptureThread(threading.Thread):
     """Streams audio from a sounddevice input; pushes CHUNK_DURATION-second numpy chunks."""
 
-    def __init__(self, device_index: Optional[int], audio_queue: queue.Queue, stop_event: threading.Event):
+    def __init__(self, device_index: Optional[int], audio_queue: queue.Queue, stop_event: threading.Event, status_callback):
         super().__init__(daemon=True)
         self.device_index = device_index
         self.audio_queue = audio_queue
         self.stop_event = stop_event
+        self.status_callback = status_callback
 
     def run(self) -> None:
         target_frames = SAMPLE_RATE * CHUNK_DURATION
@@ -123,14 +124,17 @@ class AudioCaptureThread(threading.Thread):
                 accumulated.clear()
                 acc_len = 0
 
-        with sd.InputStream(
-            device=self.device_index,
-            samplerate=SAMPLE_RATE,
-            channels=1,
-            dtype="float32",
-            callback=_callback,
-        ):
-            self.stop_event.wait()  # block until stop is requested; callback runs on its own thread
+        try:
+            with sd.InputStream(
+                device=self.device_index,
+                samplerate=SAMPLE_RATE,
+                channels=1,
+                dtype="float32",
+                callback=_callback,
+            ):
+                self.stop_event.wait()  # block until stop is requested; callback runs on its own thread
+        except Exception as exc:
+            self.status_callback(f"Device error: {type(exc).__name__}")
 
 
 # ── Thread 2: Transcription ───────────────────────────────────────────────────
@@ -161,7 +165,11 @@ class TranscriptionThread(threading.Thread):
                 continue
 
             self.status_callback("Transcribing")
-            result = self.model.transcribe(audio_chunk, fp16=False, verbose=False)
+            try:
+                result = self.model.transcribe(audio_chunk, fp16=False, verbose=False)
+            except Exception as exc:
+                self.status_callback(f"Error: {type(exc).__name__}")
+                continue
 
             text: str = result.get("text", "").strip()
             lang: str = result.get("language", "en")
@@ -336,7 +344,11 @@ class ControlPanel:
         tk.Label(frame, text="Input device:").grid(row=0, column=0, sticky="w", pady=2)
         self._device_map: dict[str, Optional[int]] = {name: idx for idx, name in devices}
         device_names = list(self._device_map.keys())
-        self._device_var = tk.StringVar(value=device_names[0])
+        default_device = next(
+            (n for n in device_names if "blackhole" in n.lower()),
+            device_names[0],
+        )
+        self._device_var = tk.StringVar(value=default_device)
         tk.OptionMenu(frame, self._device_var, *device_names).grid(row=0, column=1, sticky="ew", pady=2)
 
         # Target language
@@ -413,13 +425,16 @@ def main() -> None:
                 break
 
     def start_pipeline(device_index: Optional[int]) -> None:
+        # Join threads stopped by prior stop_pipeline before resetting shared state
+        for t in active_threads:
+            t.join(timeout=3.0)
+        active_threads.clear()
         _drain_queue(audio_q)
         _drain_queue(translation_q)
-        stop_event.clear()
-        t1 = AudioCaptureThread(device_index, audio_q, stop_event)
+        stop_event.clear()  # safe: old threads are joined
+        t1 = AudioCaptureThread(device_index, audio_q, stop_event, status_callback)
         t2 = TranscriptionThread(model, audio_q, translation_q, stop_event, status_callback)
         t3 = TranslationThread(translation_q, get_target_iso, status_callback, display_callback, stop_event)
-        active_threads.clear()
         active_threads.extend([t1, t2, t3])
         for t in active_threads:
             t.start()
@@ -427,9 +442,6 @@ def main() -> None:
 
     def stop_pipeline() -> None:
         stop_event.set()
-        for t in active_threads:
-            t.join(timeout=3.0)
-        active_threads.clear()
         status_callback("Stopped")
         root.after(0, subtitle_win.update_subtitle, "", DEFAULT_FONT_SIZE)
 
