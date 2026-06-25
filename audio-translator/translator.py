@@ -131,3 +131,55 @@ class AudioCaptureThread(threading.Thread):
             callback=_callback,
         ):
             self.stop_event.wait()  # block until stop is requested; callback runs on its own thread
+
+
+# ── Thread 2: Transcription ───────────────────────────────────────────────────
+class TranscriptionThread(threading.Thread):
+    """Transcribes audio chunks with Whisper; feeds SentenceBuffer; flushes sentences downstream."""
+
+    def __init__(
+        self,
+        model,
+        audio_queue: queue.Queue,
+        translation_queue: queue.Queue,
+        stop_event: threading.Event,
+        status_callback,
+    ):
+        super().__init__(daemon=True)
+        self.model = model
+        self.audio_queue = audio_queue
+        self.translation_queue = translation_queue
+        self.stop_event = stop_event
+        self.status_callback = status_callback
+        self._buf = SentenceBuffer()
+
+    def run(self) -> None:
+        while not self.stop_event.is_set():
+            try:
+                audio_chunk = self.audio_queue.get(timeout=1.0)
+            except queue.Empty:
+                continue
+
+            self.status_callback("Transcribing")
+            result = self.model.transcribe(audio_chunk, fp16=False, verbose=False)
+
+            text: str = result.get("text", "").strip()
+            lang: str = result.get("language", "en")
+            segments: list = result.get("segments", [])
+
+            # Silence: no text, or every segment has high no_speech_prob
+            is_silent = not text or (
+                bool(segments)
+                and all(seg.get("no_speech_prob", 1.0) > NO_SPEECH_THRESHOLD for seg in segments)
+            )
+
+            duration = segments[-1]["end"] if segments else float(CHUNK_DURATION)
+
+            if text and not is_silent:
+                self._buf.append(text, lang, duration)
+
+            sentence, detected_lang = self._buf.flush_if_needed(force=is_silent)
+            if sentence:
+                self.translation_queue.put((sentence, detected_lang))
+
+            self.status_callback("Listening")
