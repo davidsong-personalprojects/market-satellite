@@ -17,6 +17,7 @@
 import queue
 import threading
 import tkinter as tk
+from typing import Optional
 
 import numpy as np
 import sounddevice as sd
@@ -92,3 +93,41 @@ def _normalize_lang(whisper_lang: str) -> str:
 def should_translate(whisper_lang: str, target_iso: str) -> bool:
     """False when detected language already matches the target — skip translation."""
     return _normalize_lang(whisper_lang) != target_iso.lower()
+
+
+# ── Thread 1: Audio Capture ───────────────────────────────────────────────────
+class AudioCaptureThread(threading.Thread):
+    """Streams audio from a sounddevice input; pushes CHUNK_DURATION-second numpy chunks."""
+
+    def __init__(self, device_index: Optional[int], audio_queue: queue.Queue, stop_event: threading.Event):
+        super().__init__(daemon=True)
+        self.device_index = device_index
+        self.audio_queue = audio_queue
+        self.stop_event = stop_event
+
+    def run(self) -> None:
+        target_frames = SAMPLE_RATE * CHUNK_DURATION
+        accumulated: list[np.ndarray] = []
+        acc_len = 0
+
+        def _callback(indata: np.ndarray, frame_count: int, time_info, status) -> None:
+            nonlocal acc_len
+            accumulated.append(indata.copy())
+            acc_len += frame_count
+            if acc_len >= target_frames:
+                chunk = np.concatenate(accumulated).flatten()
+                try:
+                    self.audio_queue.put_nowait(chunk)
+                except queue.Full:
+                    pass  # drop chunk if transcription can't keep up
+                accumulated.clear()
+                acc_len = 0
+
+        with sd.InputStream(
+            device=self.device_index,
+            samplerate=SAMPLE_RATE,
+            channels=1,
+            dtype="float32",
+            callback=_callback,
+        ):
+            self.stop_event.wait()  # block until stop is requested; callback runs on its own thread
