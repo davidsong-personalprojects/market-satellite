@@ -17,7 +17,7 @@
 import queue
 import threading
 import tkinter as tk
-from typing import Optional
+from typing import Callable, List, Optional, Tuple
 
 import numpy as np
 import sounddevice as sd
@@ -284,3 +284,93 @@ class SubtitleWindow:
             text=text, font=font_tuple, fill="white",
             width=self._sw - 100, anchor="center",
         )
+
+
+# ── Audio Device Helper ───────────────────────────────────────────────────────
+def _get_audio_devices() -> List[Tuple[Optional[int], str]]:
+    """Return (index, name) for all input-capable devices."""
+    devices = [
+        (i, dev["name"])
+        for i, dev in enumerate(sd.query_devices())
+        if dev["max_input_channels"] > 0
+    ]
+    return devices if devices else [(None, "Default")]
+
+
+# ── Control Panel ─────────────────────────────────────────────────────────────
+class ControlPanel:
+    """Small always-on-top settings window; draggable; manages pipeline start/stop."""
+
+    def __init__(
+        self,
+        root: tk.Tk,
+        devices: List[Tuple[Optional[int], str]],
+        on_start: Callable[[Optional[int]], None],
+        on_stop: Callable[[], None],
+        target_lang_var: tk.StringVar,
+        status_var: tk.StringVar,
+        font_size_var: tk.IntVar,
+    ):
+        self._root = root
+        self._on_start = on_start
+        self._on_stop = on_stop
+        self._running = False
+        self._drag_x = self._drag_y = 0
+
+        root.title("Audio Translator")
+        root.attributes("-topmost", True)
+        root.resizable(False, False)
+
+        # Position panel top-right, clear of subtitle area
+        sw = root.winfo_screenwidth()
+        root.geometry(f"{PANEL_WIDTH}x{PANEL_HEIGHT}+{sw - PANEL_WIDTH - 20}+20")
+
+        # Drag support (click anywhere on panel to drag)
+        root.bind("<ButtonPress-1>", self._drag_start)
+        root.bind("<B1-Motion>", self._drag_motion)
+
+        frame = tk.Frame(root, padx=10, pady=10)
+        frame.pack(fill="both", expand=True)
+
+        # Device selector
+        tk.Label(frame, text="Input device:").grid(row=0, column=0, sticky="w", pady=2)
+        self._device_map: dict[str, Optional[int]] = {name: idx for idx, name in devices}
+        device_names = list(self._device_map.keys())
+        self._device_var = tk.StringVar(value=device_names[0])
+        tk.OptionMenu(frame, self._device_var, *device_names).grid(row=0, column=1, sticky="ew", pady=2)
+
+        # Target language
+        tk.Label(frame, text="Target language:").grid(row=1, column=0, sticky="w", pady=2)
+        tk.OptionMenu(frame, target_lang_var, *LANGUAGE_OPTIONS.keys()).grid(row=1, column=1, sticky="ew", pady=2)
+
+        # Font size
+        tk.Label(frame, text="Font size:").grid(row=2, column=0, sticky="w", pady=2)
+        tk.Scale(frame, from_=16, to=72, orient="horizontal", variable=font_size_var).grid(
+            row=2, column=1, sticky="ew", pady=2
+        )
+
+        # Start / Stop toggle
+        self._btn = tk.Button(frame, text="Start", command=self._toggle, width=12)
+        self._btn.grid(row=3, column=0, columnspan=2, pady=8)
+
+        # Status indicator
+        tk.Label(frame, textvariable=status_var, fg="#888888").grid(row=4, column=0, columnspan=2)
+
+        frame.columnconfigure(1, weight=1)
+
+    def _drag_start(self, event) -> None:
+        self._drag_x = event.x_root - self._root.winfo_x()
+        self._drag_y = event.y_root - self._root.winfo_y()
+
+    def _drag_motion(self, event) -> None:
+        self._root.geometry(f"+{event.x_root - self._drag_x}+{event.y_root - self._drag_y}")
+
+    def _toggle(self) -> None:
+        if self._running:
+            self._on_stop()
+            self._btn.configure(text="Start")
+        else:
+            device_idx = self._device_map.get(self._device_var.get())
+            self._on_start(device_idx)
+            self._btn.configure(text="Stop")
+        self._running = not self._running
