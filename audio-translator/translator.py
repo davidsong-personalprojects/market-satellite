@@ -66,3 +66,29 @@ class SentenceBuffer:
     def clear(self) -> None:
         self._texts.clear()
         self._duration = 0.0
+
+
+# ── Language Utilities ────────────────────────────────────────────────────────
+LANGUAGE_OPTIONS: dict[str, str] = {
+    "English": "en",
+    "Korean": "ko",
+    "Japanese": "ja",
+    "Spanish": "es",
+    "Chinese Simplified": "zh-CN",
+    "French": "fr",
+}
+
+# Whisper uses its own language codes; Chinese diverges from ISO 639-1
+_WHISPER_TO_ISO: dict[str, str] = {
+    "chinese": "zh-CN",
+    "zh": "zh-CN",
+}
+
+
+def _normalize_lang(whisper_lang: str) -> str:
+    return _WHISPER_TO_ISO.get(whisper_lang.lower(), whisper_lang.lower()).lower()
+
+
+def should_translate(whisper_lang: str, target_iso: str) -> bool:
+    """False when detected language already matches the target — skip translation."""
+    return _normalize_lang(whisper_lang) != target_iso.lower()
