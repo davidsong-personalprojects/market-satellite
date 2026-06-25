@@ -35,3 +35,34 @@ SUBTITLE_BOTTOM_OFFSET = 80   # px from bottom of screen to subtitle centre
 SUBTITLE_PADDING = 12         # px padding around subtitle background rectangle
 PANEL_WIDTH = 300
 PANEL_HEIGHT = 240
+
+# ── Sentence Buffer ───────────────────────────────────────────────────────────
+class SentenceBuffer:
+    """Accumulates Whisper text chunks; flushes on sentence boundaries."""
+
+    def __init__(self):
+        self._texts: list[str] = []
+        self._lang: str = "en"
+        self._duration: float = 0.0
+
+    def append(self, text: str, lang: str, duration: float) -> None:
+        self._texts.append(text.strip())
+        self._lang = lang
+        self._duration += duration
+
+    def flush_if_needed(self, force: bool = False) -> tuple[str, str]:
+        """Return (sentence, lang) and clear, or ('', '') if not flushing yet."""
+        if not self._texts:
+            return "", ""
+        full_text = " ".join(self._texts).strip()
+        ends_sentence = bool(full_text) and full_text[-1] in SENTENCE_ENDINGS
+        if force or ends_sentence or self._duration >= MAX_BUFFER_DURATION:
+            lang = self._lang
+            self._texts.clear()
+            self._duration = 0.0
+            return full_text, lang
+        return "", ""
+
+    def clear(self) -> None:
+        self._texts.clear()
+        self._duration = 0.0
